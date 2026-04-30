@@ -473,21 +473,63 @@ end
 
 ### Categorías de modelos
 
-| Dominio | Modelos principales |
+91 tablas en producción. Modelos organizados por dominio:
+
+| Dominio | Modelos |
 | --- | --- |
 | Tenancy | `BusinessUnit` |
-| Auth Admin | `User`, `Role`, `Privilege` |
+| Auth Admin | `User`, `Role`, `Privilege`, `RolePrivilege` |
 | Auth Móvil | `Employee` (Devise) |
 | Auth Externo | `ApiUser`, `ApiKey` |
-| Vehículos | `Vehicle`, `VehicleType`, `VehicleAsignation`, `VehicleCheck`, `VehicleDocument` |
-| Empleados | `Employee`, `EmployeeVacation`, `EmployeeAppointment`, `EmployeeDeduction`, `DriversLevel`, `Labor` |
-| Clientes | `Client`, `ClientBranchOffice`, `ClientUser` |
-| Viajes TTPN | `TtpnBooking`, `TravelCount`, `TtpnService`, `TtpnServiceType`, `Concessionaire` |
-| Nómina | `Payroll`, `PayrollItem`, `Invoicing`, `InvoiceType`, `KumiSetting` |
-| Combustible | `GasCharge`, `GasFile`, `GasStation`, `GasolineCharge`, `FuelPerformanceCache` |
+| Vehículos | `Vehicle`, `VehicleType`, `VehicleAsignation`, `VehicleCheck`, `VehicleDocument`, `VehicleDocumentType`, `VehicleTypePrice` |
+| Mantenimiento | `VeAsignation`, `VehicleEvent`, `ScheduledMaintenance`, `DriverRequest`, `ServiceAppointment` |
+| Empleados | `Employee`, `EmployeeDocument`, `EmployeeDocumentType`, `EmployeeSalary`, `EmployeeMovement`, `EmployeeMovementType`, `EmployeeVacation`, `EmployeeAppointment`, `EmployeeAppointmentLog`, `EmployeeDeduction`, `EmployeesIncidence`, `EmployeeWorkDay`, `EmployeeDriversLevel`, `DriversLevel`, `Labor` |
+| Clientes | `Client`, `ClientBranchOffice`, `ClientContact`, `ClientBranchOfficeContact`, `ClientBranchOfficeTtpnContact`, `ClientEmployee`, `ClientUser`, `ClientTtpnService` |
+| Viajes TTPN | `TtpnBooking`, `TtpnBookingPassenger`, `TravelCount`, `TtpnService`, `TtpnServiceType`, `TtpnServicePrice`, `TtpnServiceDriverIncrease`, `TtpnForeignDestiny`, `Concessionaire`, `CooTravelRequest`, `CooTravelEmployeeRequest` |
+| Precios por Segmento de Pasajeros | `CtsIncrement`, `CtsIncrementDetail`, `CtsDriverIncrement` |
+| Nómina | `Payroll`, `PayrollLog`, `Invoicing`, `InvoiceType` |
+| Combustible | `GasCharge`, `GasFile`, `GasStation`, `GasolineCharge` |
 | Alertas | `Alert`, `AlertRule`, `AlertRuleRecipient`, `AlertDelivery`, `AlertRead`, `AlertContact` |
-| Catálogos | `Supplier`, `Discrepancy`, `ReviewPoint` |
-| Versiones | `AppVersion` |
+| Ruteo | `CrDay`, `CrdHr`, `CrdhRoute`, `CrdhrPoint` |
+| Configuración del sistema | `KumiSetting` |
+| Catálogos globales | `Supplier`, `Discrepancy`, `ReviewPoint`, `Incidence` |
+| Auditoría (PaperTrail) | `Version` |
+
+### Configuración del sistema — KumiSetting
+
+`KumiSetting` almacena pares clave-valor por Business Unit. Es la única fuente de configuración mutable en runtime (sin deploy).
+
+```ruby
+KumiSetting.get_value(business_unit_id, key, default)
+KumiSetting.set_value(business_unit_id, key, value, category:)
+```
+
+#### Keys disponibles
+
+| Categoría | Key | Tipo | Valores | Default |
+| --- | --- | --- | --- | --- |
+| `payroll` | `payroll.dia_pago` | Integer | 0=Dom … 6=Sáb | `4` (Jueves) |
+| `payroll` | `payroll.periodo` | String | `semanal`, `quincenal`, `mensual` | `semanal` |
+| `payroll` | `payroll.hora_corte` | String HH:MM | e.g. `01:30` | `01:30` |
+| `vacations` | `vacations.periodos` | JSON | `{ "1": 12, "2": 14, ... }` | LFT 2023 |
+
+#### Tabla de vacaciones LFT 2023 (default)
+
+| Años trabajados | Días de vacaciones |
+| --- | --- |
+| 1 | 12 |
+| 2 | 14 |
+| 3 | 16 |
+| 4 | 18 |
+| 5 | 20 |
+| 6 | 22 |
+| 7 | 24 |
+| 8 | 26 |
+| 9 | 28 |
+| 10 | 30 |
+| 11+ | +2 días por cada 5 años adicionales |
+
+Inicializar defaults para una BU nueva: `KumiSetting.initialize_defaults(business_unit_id)`
 
 ### Funciones PostgreSQL
 
