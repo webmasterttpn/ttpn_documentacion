@@ -104,7 +104,7 @@ Aplica a todas las rutas (`/*`). Incluye todos los headers del API más:
 
 ```text
 default-src 'self'
-script-src  'self' 'unsafe-inline' 'unsafe-eval'
+script-src  'self'
 style-src   'self' 'unsafe-inline'
 img-src     'self' data: blob: https:
 font-src    'self' data:
@@ -117,6 +117,9 @@ frame-ancestors 'none'
 object-src  'none'
 base-uri    'self'
 ```
+
+> `script-src`: `'unsafe-inline'` y `'unsafe-eval'` eliminados (2026-04-29). Vue 3 + Vite pre-compila templates — no usa `eval()` en producción y no inyecta scripts inline.
+> `style-src`: `'unsafe-inline'` se mantiene — requerido por los `:style` bindings dinámicos de Quasar (drawer widths, dialog positioning, temas).
 
 **Si cambias el dominio de la API en Railway**, actualizar `connect-src` en `_headers`.
 
@@ -576,9 +579,9 @@ curl -I https://kumi-admin-api-production.up.railway.app | grep -i strict
 ## 11. Pendientes
 
 - [ ] **RLS**: Ejecutar `rls_policies.sql` en Supabase (dev y prod)
-- [ ] **Railway**: Eliminar variable `APP_USER_DATABASE_URL` del dashboard (fue creada por error — los scripts Python ya usan `DATABASE_URL`)
-- [ ] **CSP Frontend**: Revisar si `'unsafe-inline'` y `'unsafe-eval'` en `script-src` pueden eliminarse con Quasar build configurado para nonces o hashes
-- [ ] **FRONTEND_URL**: Verificar que Railway tiene `FRONTEND_URL=https://kumi.ttpn.com.mx` configurada
-- [ ] **ActionCable**: Verificar que `kumi.ttpn.com.mx` está en `allowed_request_origins` de `application.rb`
+- [x] **Railway**: ~~Eliminar variable `APP_USER_DATABASE_URL`~~ — eliminada (2026-04-29)
+- [x] **CSP Frontend**: `'unsafe-inline'` y `'unsafe-eval'` eliminados de `script-src` (2026-04-29) — `style-src` mantiene `'unsafe-inline'` por requerimiento de Quasar
+- [x] **FRONTEND_URL**: Confirmada en Railway — `FRONTEND_URL=https://kumi.ttpn.com.mx` (2026-04-29)
+- [x] **ActionCable**: `kumi.ttpn.com.mx` confirmado en `allowed_request_origins` de `application.rb` (2026-04-29)
 - [ ] **API Keys**: Establecer proceso formal de rotación semestral (recordatorio en calendario)
 - [ ] **Webhooks AWS credentials**: Las credenciales AWS que aparecían en `RAILWAY_STAGING_DEPLOYMENT_GUIDE.md` y `railway_deployment.md` fueron redactadas (2026-04-29). Rotar en AWS IAM si aún no se ha hecho.
