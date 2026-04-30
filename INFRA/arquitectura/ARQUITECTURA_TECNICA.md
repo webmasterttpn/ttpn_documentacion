@@ -10,7 +10,7 @@
 2. [Multi-tenancy: Business Units](#2-multi-tenancy-business-units)
 3. [Backend — Rails API](#3-backend--rails-api)
 4. [Autenticación — Tres Canales Separados](#4-autenticación--tres-canales-separados)
-5. [Autorización — Pundit + Privileges](#5-autorización--pundit--privileges)
+5. [Autorización — CanCan + Privileges](#5-autorización--cancan--privileges)
 6. [Jobs en Background — Sidekiq](#6-jobs-en-background--sidekiq)
 7. [Tiempo Real — ActionCable](#7-tiempo-real--actioncable)
 8. [Almacenamiento — ActiveStorage + AWS S3](#8-almacenamiento--activestorage--aws-s3)
@@ -73,7 +73,7 @@ Kumi TTPN Admin V2 es un sistema de gestión para empresas de transporte de gas 
 | Cache / Cola | Redis 7 |
 | Jobs | Sidekiq 8 + sidekiq-cron |
 | Autenticación | Devise + devise-jwt + Lockable (manual) |
-| Autorización | Pundit + objeto Privileges en JWT |
+| Autorización | CanCan (ability.rb) + objeto Privileges en JWT |
 | WebSockets | ActionCable |
 | Almacenamiento | ActiveStorage → AWS S3 (prod) / local (dev) |
 | Rate limiting | rack-attack (Redis backend) |
@@ -309,26 +309,40 @@ Devise Lockable no funciona automáticamente con JWT (requiere Warden). Implemen
 
 ---
 
-## 5. Autorización — Pundit + Privileges
+## 5. Autorización — CanCan + Privileges
 
-### Pundit Policies
+### CanCan (ability.rb)
 
-La autorización a nivel de recurso usa **Pundit**. Cada modelo tiene su policy en `app/policies/`.
+La autorización a nivel de acción/recurso usa **CanCan**. Las reglas viven en `app/models/ability.rb` y se definen por rol del usuario (sistemas, admin, rh, coordinador, etc.):
 
 ```ruby
-# app/policies/vehicle_policy.rb
-class VehiclePolicy < ApplicationPolicy
-  def update?
-    user.admin? || record.business_unit_id == user.business_unit_id
+# app/models/ability.rb
+class Ability
+  include CanCan::Ability
+
+  def initialize(user)
+    return unless user
+    user.role&.nombre.tap do |rol|
+      can :manage, :all if user.sadmin?
+      can :manage, Vehicle if rol == 'admin'
+      # ... resto de reglas por rol
+    end
   end
 end
 
-# En el controller:
-def update
-  authorize @vehicle
-  # ...
-end
+# En el controller (cuando se usa authorize!):
+authorize! :update, @vehicle
 ```
+
+### Multi-tenancy — scope de BU en find
+
+La autorización de datos (qué registros puede ver) se hace siempre scoping por `business_unit_id`:
+
+```ruby
+@record = Model.where(business_unit_id: @business_unit_id).find(params[:id])
+```
+
+Esto previene IDOR — un usuario de BU-A nunca puede acceder a registros de BU-B aunque tenga el ID.
 
 ### Objeto Privileges en JWT
 

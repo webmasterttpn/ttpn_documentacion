@@ -256,20 +256,20 @@ Agregar el `q-badge` y cambiar `@click="showFilters = !showFilters"` a `@click="
 
 ## Páginas pendientes de migrar
 
-Páginas que actualmente tienen panel de filtros y pueden adoptar este estándar:
+> **Actualización 2026-04-30:** De las 10 páginas originales, **8 fueron migradas**. Quedan 2 pendientes.
 
-| Página | Campos de filtro | Prioridad |
-|---|---|---|
-| `TtpnBookings/TravelCountsPage.vue` | 6 filtros (employees, vehicles, plants, services, etc.) | Alta |
-| `TtpnBookings/DiscrepanciesPage.vue` | Fechas, estado | Alta |
-| `DriverRequests/DriverRequestsPage.vue` | Fechas, vehículo, chofer | Alta |
-| `Gas/GasChargesPage.vue` | Fecha, vehículo | Media |
-| `Gas/GasolineChargesPage.vue` | Fecha, status | Media |
-| `Gas/FuelPerformancePage.vue` | Rango de fechas | Media |
-| `EmployeesIncidencesPage.vue` | Fecha, empleado, tipo | Media |
-| `EmployeeVacationsPage.vue` | Fecha, empleado | Media |
-| `EmployeeAppointments/EmployeeAppointmentsPage.vue` | Fecha, tipo | Baja |
-| `VehicleChecks/VehicleChecksPage.vue` | Fecha, vehículo | Baja |
+| Página | Estado |
+|---|---|
+| `TtpnBookings/TravelCountsPage.vue` | ✅ Migrada |
+| `TtpnBookings/DiscrepanciesPage.vue` | ⏳ **Pendiente** |
+| `DriverRequests/DriverRequestsPage.vue` | ✅ Migrada |
+| `Gas/GasChargesPage.vue` | ✅ Migrada |
+| `Gas/GasolineChargesPage.vue` | ✅ Migrada |
+| `Gas/FuelPerformancePage.vue` | ⏳ **Pendiente** |
+| `EmployeesIncidencesPage.vue` | ✅ Migrada |
+| `EmployeeVacationsPage.vue` | ✅ Migrada |
+| `EmployeeAppointments/EmployeeAppointmentsPage.vue` | ✅ Migrada |
+| `VehicleChecks/VehicleChecksPage.vue` | ✅ Migrada |
 
 ---
 

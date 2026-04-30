@@ -38,4 +38,6 @@ Quién tomó la decisión de dejarlo así y en qué contexto.
 | Archivo | Dominio | Status | Fecha |
 | --- | --- | --- | --- |
 | [2026-01-15_regla_15_min_bookings.md](2026-01-15_regla_15_min_bookings.md) | bookings | Pendiente | 2026-01-15 |
-
+| [2026-03-19_backfill_clvs_thread_new.md](2026-03-19_backfill_clvs_thread_new.md) | bookings | Pendiente | 2026-03-19 |
+| [2026-03-20_silent_catch_blocks.md](2026-03-20_silent_catch_blocks.md) | frontend | Pendiente | 2026-03-20 |
+| [2026-03-23_filterpanel_2_paginas_pendientes.md](2026-03-23_filterpanel_2_paginas_pendientes.md) | frontend — Gas | Pendiente | 2026-03-23 |

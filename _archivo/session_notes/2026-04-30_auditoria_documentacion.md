@@ -114,12 +114,17 @@ Documenta las decisiones de la sesión de auditoría (2026-04-29):
 | Archivo | Tipo de cambio |
 | --- | --- |
 | `Documentacion/INFRA/PRD.md` | Actualización (stack + reglas + referencias) |
-| `Documentacion/INFRA/arquitectura/ARQUITECTURA_TECNICA.md` | Reescritura completa |
+| `Documentacion/INFRA/arquitectura/ARQUITECTURA_TECNICA.md` | Reescritura completa + corrección Pundit → CanCan |
 | `Documentacion/INFRA/arquitectura/ADR/ADR-008-hardening-seguridad-2026.md` | Nuevo |
-| `Documentacion/INFRA/onboarding/onboarding_BE.md` | Fix CanCanCan → Pundit |
+| `Documentacion/INFRA/onboarding/onboarding_BE.md` | Corrección CanCan (se corrigió "Pundit" erróneo escrito en sesión anterior) |
 | `Documentacion/Backend/dominio/alertas/README.md` | Expansión |
 | `Documentacion/Backend/dominio/combustible/README.md` | Expansión |
 | `Documentacion/Backend/dominio/servicios_ttpn/README.md` | Expansión |
 | `Documentacion/Backend/dominio/proveedores/README.md` | Expansión |
 | `Documentacion/Backend/dominio/ruteo/README.md` | Expansión |
+| `Documentacion/_archivo/cambios/FE/2026-03-23_filterpanel_estandar.md` | Actualización estado: 8/10 migradas, 2 pendientes |
+| `Documentacion/_archivo/deuda_tecnica/README.md` | +3 items nuevos |
+| `Documentacion/_archivo/deuda_tecnica/2026-03-19_backfill_clvs_thread_new.md` | Nuevo |
+| `Documentacion/_archivo/deuda_tecnica/2026-03-20_silent_catch_blocks.md` | Nuevo |
+| `Documentacion/_archivo/deuda_tecnica/2026-03-23_filterpanel_2_paginas_pendientes.md` | Nuevo |
 | `Documentacion/Backend/dominio/finanzas/README.md` | Expansión |
