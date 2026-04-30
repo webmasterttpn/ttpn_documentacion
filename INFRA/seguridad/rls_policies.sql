@@ -13,8 +13,9 @@
 --                      6543 (Transaction Pooler). RLS NO le afecta.
 --                      Es SEGURO habilitar RLS sin romper Android/PHP.
 --
---   app_user          → Rol nuevo para N8N y scripts Python. SIN BYPASSRLS.
---                      RLS sí aplica. Debe establecer BU antes de queries.
+--   app_user          → Rol para scripts Python con conexión directa a BD.
+--                      SIN BYPASSRLS. RLS sí aplica.
+--                      N8N NO usa este rol — N8N llama al Rails API via API Key.
 --
 -- PUERTO 6543 (Transaction Pooler) vs SET LOCAL:
 --   El Transaction Pooler (pgbouncer modo transacción) devuelve la conexión
@@ -36,7 +37,8 @@
 
 
 -- ── PASO 1: Crear rol app_user (si no existe) ────────────────
--- Este rol es para N8N y Python. SIN BYPASSRLS.
+-- Rol para scripts Python con conexión directa a BD. SIN BYPASSRLS.
+-- N8N usa API Keys del Rails API — no conecta directo a la BD.
 
 DO $$
 BEGIN
@@ -45,8 +47,8 @@ BEGIN
   END IF;
 END$$;
 
--- Permisos mínimos: solo SELECT, INSERT, UPDATE en tablas operativas
--- (ajustar según lo que N8N y Python realmente necesiten)
+-- Permisos mínimos: solo SELECT en tablas operativas
+-- (ajustar según lo que los scripts Python realmente necesiten)
 GRANT USAGE ON SCHEMA public TO app_user;
 GRANT SELECT ON ALL TABLES IN SCHEMA public TO app_user;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO app_user;
@@ -93,7 +95,7 @@ ALTER TABLE vehicles                        ENABLE ROW LEVEL SECURITY;
 -- ── PASO 3: Policies por tabla ────────────────────────────────
 -- Patrón: solo ver/modificar registros de tu propia BU.
 -- La BU se establece con: SET LOCAL app.current_business_unit_id = <id>;
--- (lo hacen los scripts Python y los workflows de N8N antes de queries)
+-- (lo hacen los scripts Python antes de cada query)
 
 CREATE POLICY rls_alert_contacts ON alert_contacts
   FOR ALL USING (business_unit_id = current_setting('app.current_business_unit_id', true)::int);
@@ -221,24 +223,26 @@ ORDER BY tablename;
 -- Resultado esperado: todas las filas con rls_enabled = true
 
 
--- ── CÓMO USAR DESDE N8N Y PYTHON ─────────────────────────────
+-- ── CÓMO CONECTAN LOS DISTINTOS ACTORES ──────────────────────
 --
--- SET LOCAL solo vive dentro de la transacción actual.
--- Con el Transaction Pooler (puerto 6543) es OBLIGATORIO usar
--- BEGIN...COMMIT para que SET LOCAL persista entre statements.
+-- ── N8N ───────────────────────────────────────────────────────
 --
--- ── Python (utils/db.py) ──────────────────────────────────────
+--   N8N NO conecta directo a la BD. Llama al Rails API via HTTP
+--   usando una API Key (modelo ApiKey / ApiUser en Rails).
+--   El filtrado de BU lo hace el ORM de Rails internamente.
+--   N8N no necesita SET LOCAL ni rol app_user.
 --
---   OPCIÓN A: Conexión directa a Supabase (NO el pooler)
---   Host: db.<project-ref>.supabase.co, Puerto: 5432
---   SET LOCAL funciona sin BEGIN explícito porque la conexión es persistente.
+-- ── Python (utils/db.py, via app_user con RLS) ───────────────
+--
+--   Usar puerto 5432 (Session Pooler / conexión directa), NO 6543.
+--   SET LOCAL solo vive dentro de la transacción. Con psycopg2:
 --
 --   with conn.cursor() as cur:
 --       cur.execute("SET LOCAL app.current_business_unit_id = %s", (bu_id,))
 --       cur.execute("SELECT * FROM employees")
 --       return cur.fetchall()
 --
---   OPCIÓN B: Vía Transaction Pooler (puerto 6543) — envolver en transacción
+--   Si se usa el Transaction Pooler (6543), envolver en transacción explícita:
 --
 --   with conn:                               # BEGIN implícito de psycopg2
 --       with conn.cursor() as cur:
@@ -246,17 +250,6 @@ ORDER BY tablename;
 --           cur.execute("SELECT * FROM employees")
 --           return cur.fetchall()
 --                                            # COMMIT al salir del bloque with
---
--- ── N8N (nodo PostgreSQL) ─────────────────────────────────────
---
---   Agregar un nodo "Execute Query" ANTES de la query real con:
---
---     BEGIN;
---     SELECT set_config('app.current_business_unit_id',
---                       '{{ $json.business_unit_id }}', true);
---
---   Luego conectar al nodo con la query de negocio.
---   Agregar un nodo final con COMMIT si N8N no lo cierra automáticamente.
 --
 -- ── Comportamiento de seguridad si no se establece la BU ──────
 --

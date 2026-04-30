@@ -399,14 +399,14 @@ El SQL está listo en `Documentacion/INFRA/seguridad/rls_policies.sql`. **Aún n
 | --- | --- | --- | --- |
 | Rails API (producción) | `service_role` | ✅ Sí | No — el ORM filtra por BU |
 | Android / PHP (pruebas) | `postgres` vía pooler :6543 | ✅ Sí | No — superusuario |
-| N8N (futuro) | `app_user` | ❌ No | Sí — necesita `SET LOCAL` |
+| N8N | N/A — llama Rails API vía HTTP + API Key | N/A | No aplica — Rails filtra por BU |
 | Python scripts (futuro) | `app_user` | ❌ No | Sí — necesita `SET LOCAL` |
 
 ### Transaction Pooler (puerto 6543) y SET LOCAL
 
 El puerto 6543 es el Transaction Pooler de Supabase (pgbouncer en modo transacción). `SET LOCAL` solo vive dentro de la transacción actual.
 
-**Patrón obligatorio para N8N y Python con el pooler:**
+**Patrón obligatorio para Python con el pooler:**
 
 ```sql
 BEGIN;
@@ -576,8 +576,7 @@ curl -I https://kumi-admin-api-production.up.railway.app | grep -i strict
 ## 11. Pendientes
 
 - [ ] **RLS**: Ejecutar `rls_policies.sql` en Supabase (dev y prod)
-- [ ] **RLS**: Actualizar N8N para usar rol `app_user` + `SET LOCAL` antes de queries
-- [ ] **RLS**: Actualizar scripts Python (`utils/db.py`) para usar `app_user` y `SET LOCAL`
+- [ ] **RLS**: Actualizar scripts Python (`utils/db.py`) para conectar como `app_user` y hacer `SET LOCAL` antes de queries
 - [ ] **CSP Frontend**: Revisar si `'unsafe-inline'` y `'unsafe-eval'` en `script-src` pueden eliminarse con Quasar build configurado para nonces o hashes
 - [ ] **FRONTEND_URL**: Verificar que Railway tiene `FRONTEND_URL=https://kumi.ttpn.com.mx` configurada
 - [ ] **ActionCable**: Verificar que `kumi.ttpn.com.mx` está en `allowed_request_origins` de `application.rb`
