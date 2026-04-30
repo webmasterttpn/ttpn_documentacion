@@ -67,13 +67,16 @@ Cada registro en casi toda la BD pertenece a una `business_unit_id`. Los usuario
 |---|---|
 | Framework | Ruby on Rails 7.1 (API mode) |
 | Base de datos | PostgreSQL (Supabase Pro en producción) |
-| Autenticación | Devise + JWT (gem `devise-jwt`) |
+| Autenticación | Devise + JWT (gem `devise-jwt`) + Lockable (brute force) |
 | Jobs asíncronos | Sidekiq + Redis |
 | Caching | Redis |
 | Documentación API | Rswag (Swagger UI en `/api-docs`) |
 | Gestión de memoria | `puma_worker_killer` |
 | Autorización | Custom (Privilege model + role_privileges) |
-| Almacenamiento archivos | ActiveStorage (Supabase Storage en prod) |
+| Almacenamiento archivos | ActiveStorage (AWS S3 en prod) |
+| Rate limiting | `rack-attack` (Redis backend) |
+| Request timeout | `rack-timeout` (env vars `RACK_TIMEOUT_SERVICE_TIMEOUT=25`) |
+| CVE scanning | `bundler-audit` |
 
 ### Frontend
 
@@ -1202,6 +1205,11 @@ function calcularDistancia(lat1, lon1, lat2, lon2) {
 8. Los tokens se revocan inmediatamente al logout regenerando el `jti`
 9. El IMEI para binding de dispositivo está descartado (Android 10+ lo bloquea); se usa AndroidID como alternativa
 10. Los endpoints de admin no son accesibles con token de chofer y viceversa
+11. Rate limiting via `rack-attack`: 5 req/20s en login, 300 req/5min en API general, bloqueo automático de 1h tras 20 intentos fallidos
+12. Lockout de cuenta (Devise Lockable): 10 intentos fallidos de login → cuenta bloqueada 1 hora
+13. CSP Frontend: `script-src 'self'` únicamente — sin `unsafe-inline` ni `unsafe-eval`
+14. Pre-commit hook en `.githooks/pre-commit` detecta AWS keys, tokens Railway/Heroku y secrets antes de cada commit
+15. API Keys externas (N8N, apps cliente) se gestionan desde el modelo `ApiKey` y se rotan semestralmente — ver `INFRA/seguridad/rotacion_api_keys.md`
 
 ### Versiones de App
 
@@ -1218,7 +1226,8 @@ function calcularDistancia(lat1, lon1, lat2, lon2) {
 ---
 
 *Para más contexto sobre decisiones de arquitectura ver:*
-- [ARQUITECTURA_MONOLITO_VS_MICROSERVICIOS.md](ARQUITECTURA_MONOLITO_VS_MICROSERVICIOS.md)
-- [INFRAESTRUCTURA_RAILWAY_NETLIFY_SUPABASE.md](INFRAESTRUCTURA_RAILWAY_NETLIFY_SUPABASE.md)
-- [PROPUESTA_REGISTERED_APPS.md](ttpngas/documentacion/PROPUESTA_REGISTERED_APPS.md)
-- [MIGRACION_PHP_A_RUBY.md](MIGRACION_PHP_A_RUBY.md)
+- [ARQUITECTURA_TECNICA.md](arquitectura/ARQUITECTURA_TECNICA.md)
+- [MONOLITO_VS_MICROSERVICIOS.md](arquitectura/MONOLITO_VS_MICROSERVICIOS.md)
+- [RAILWAY_NETLIFY_SUPABASE.md](infraestructura/RAILWAY_NETLIFY_SUPABASE.md)
+- [SEGURIDAD.md](seguridad/SEGURIDAD.md)
+- [rotacion_api_keys.md](seguridad/rotacion_api_keys.md)

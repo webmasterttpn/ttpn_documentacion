@@ -1,1343 +1,785 @@
-# 🏗️ Arquitectura Técnica - Kumi TTPN Admin V2
+# Arquitectura Técnica — Kumi TTPN Admin V2
 
-## 📋 Tabla de Contenidos
-
-1. [Visión General](#visión-general)
-2. [Arquitectura de Alto Nivel](#arquitectura-de-alto-nivel)
-3. [Backend (Rails API)](#backend-rails-api)
-4. [Frontend (Quasar PWA)](#frontend-quasar-pwa)
-5. [Base de Datos](#base-de-datos)
-6. [Autenticación y Autorización](#autenticación-y-autorización)
-7. [Jobs en Background](#jobs-en-background)
-8. [Caching](#caching)
-9. [Deployment](#deployment)
-10. [Seguridad](#seguridad)
-11. [Performance](#performance)
-12. [Monitoreo](#monitoreo)
+**Última actualización:** 2026-04-30
 
 ---
 
-## 🎯 Visión General
+## Tabla de Contenidos
 
-Kumi TTPN Admin V2 es una aplicación full-stack moderna diseñada para la gestión de servicios de transporte y logística. La arquitectura sigue el patrón de **API-first** con separación clara entre backend y frontend.
-
-### Principios de Diseño
-
-- **API-First:** El backend expone una API REST que puede ser consumida por múltiples clientes
-- **Microservicios Ready:** Arquitectura preparada para evolucionar a microservicios
-- **PWA:** Frontend como Progressive Web App para soporte multiplataforma
-- **Stateless:** API sin estado para escalabilidad horizontal
-- **Event-Driven:** Jobs asíncronos para operaciones pesadas
-
----
-
-## 🏛️ Arquitectura de Alto Nivel
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                        CLIENTES                              │
-├─────────────────────────────────────────────────────────────┤
-│  PWA (Quasar)  │  Mobile App  │  Third-party Apps           │
-└────────┬────────────────┬─────────────────┬─────────────────┘
-         │                │                 │
-         └────────────────┴─────────────────┘
-                          │
-                    ┌─────▼─────┐
-                    │   NGINX   │ (Producción)
-                    │  Reverse  │
-                    │   Proxy   │
-                    └─────┬─────┘
-                          │
-         ┌────────────────┴────────────────┐
-         │                                 │
-    ┌────▼─────┐                    ┌─────▼────┐
-    │  Rails   │                    │  Quasar  │
-    │   API    │                    │   PWA    │
-    │  :3000   │                    │  :9000   │
-    └────┬─────┘                    └──────────┘
-         │
-    ┌────▼─────────────────────────┐
-    │    Application Layer         │
-    ├──────────────────────────────┤
-    │  Controllers │ Services      │
-    │  Serializers │ Workers       │
-    └────┬─────────────────────────┘
-         │
-    ┌────▼─────────────────────────┐
-    │     Data Layer               │
-    ├──────────────────────────────┤
-    │  PostgreSQL │ Redis          │
-    │  (Primary)  │ (Cache/Queue)  │
-    └──────────────────────────────┘
-         │
-    ┌────▼─────────────────────────┐
-    │   External Services          │
-    ├──────────────────────────────┤
-    │  AWS S3  │ FCM  │ Email      │
-    └──────────────────────────────┘
-```
+1. [Visión General](#1-visión-general)
+2. [Multi-tenancy: Business Units](#2-multi-tenancy-business-units)
+3. [Backend — Rails API](#3-backend--rails-api)
+4. [Autenticación — Tres Canales Separados](#4-autenticación--tres-canales-separados)
+5. [Autorización — Pundit + Privileges](#5-autorización--pundit--privileges)
+6. [Jobs en Background — Sidekiq](#6-jobs-en-background--sidekiq)
+7. [Tiempo Real — ActionCable](#7-tiempo-real--actioncable)
+8. [Almacenamiento — ActiveStorage + AWS S3](#8-almacenamiento--activestorage--aws-s3)
+9. [Base de Datos — PostgreSQL vía Supabase](#9-base-de-datos--postgresql-vía-supabase)
+10. [Automatización — N8N](#10-automatización--n8n)
+11. [Seguridad — Capas Implementadas](#11-seguridad--capas-implementadas)
+12. [Frontend — Quasar PWA](#12-frontend--quasar-pwa)
+13. [Deployment — Railway + Supabase + Netlify](#13-deployment--railway--supabase--netlify)
 
 ---
 
-## 🔴 Backend (Rails API)
+## 1. Visión General
 
-### Estructura de Capas
+Kumi TTPN Admin V2 es un sistema de gestión para empresas de transporte de gas LP y servicios de carga. Permite administrar vehículos, empleados, bookings de viaje, nómina, combustible, clientes y alertas, todo bajo un modelo multi-tenant por unidad de negocio.
 
+### Arquitectura general
+
+```text
+                        Internet
+                           │
+              ┌────────────┴────────────┐
+              │                         │
+      ┌───────▼───────┐        ┌────────▼────────┐
+      │  Quasar PWA   │        │  App Móvil       │
+      │  (Netlify)    │        │  (Capacitor)     │
+      └───────┬───────┘        └────────┬─────────┘
+              │                         │
+              │   HTTPS + Bearer JWT    │
+              └────────────┬────────────┘
+                           │
+                ┌──────────▼──────────┐
+                │   Rails 7.1 API     │  Railway
+                │   kumi_admin_api    │
+                └──────────┬──────────┘
+                           │
+            ┌──────────────┼──────────────┐
+            │              │              │
+     ┌──────▼─────┐  ┌─────▼──────┐  ┌───▼──────┐
+     │ PostgreSQL │  │   Redis 7  │  │  AWS S3  │
+     │ (Supabase) │  │  (Railway) │  │          │
+     └────────────┘  └────────────┘  └──────────┘
+                           │
+                  ┌────────▼────────┐
+                  │ Sidekiq Worker  │  Railway
+                  │ kumi_sidekiq   │
+                  └─────────────────┘
+                           │
+                  ┌────────▼────────┐
+                  │   N8N           │  Railway
+                  │ (Automatización)│
+                  └─────────────────┘
 ```
-┌─────────────────────────────────────┐
-│         Presentation Layer          │
-│  (Controllers, Serializers)         │
-├─────────────────────────────────────┤
-│         Business Logic Layer        │
-│  (Services, Concerns, Validators)   │
-├─────────────────────────────────────┤
-│         Data Access Layer           │
-│  (Models, Repositories)             │
-├─────────────────────────────────────┤
-│         Infrastructure Layer        │
-│  (Database, Cache, External APIs)   │
-└─────────────────────────────────────┘
+
+### Stack
+
+| Capa | Tecnología |
+| --- | --- |
+| API | Ruby on Rails 7.1 (API mode) + Ruby 3.3 |
+| Base de datos | PostgreSQL 15 vía Supabase Pro (pgbouncer en prod) |
+| Cache / Cola | Redis 7 |
+| Jobs | Sidekiq 8 + sidekiq-cron |
+| Autenticación | Devise + devise-jwt + Lockable (manual) |
+| Autorización | Pundit + objeto Privileges en JWT |
+| WebSockets | ActionCable |
+| Almacenamiento | ActiveStorage → AWS S3 (prod) / local (dev) |
+| Rate limiting | rack-attack (Redis backend) |
+| Request timeout | rack-timeout (env vars) |
+| CVE scanning | bundler-audit |
+| API Docs | rswag (Swagger/OpenAPI en `/api-docs`) |
+| Frontend | Quasar 2.16 + Vue 3.4 + Vite |
+| Deploy BE | Railway (3 servicios: API, Sidekiq, Redis) |
+| Deploy FE | Netlify (auto-deploy desde GitLab) |
+| Automatización | N8N self-hosted en Railway |
+
+---
+
+## 2. Multi-tenancy: Business Units
+
+**Todos los datos de negocio están scoped por `business_unit_id`.** Nunca se mezclan datos entre Business Units (BUs).
+
+### Cómo funciona
+
+- Cada `User` pertenece a una `BusinessUnit`
+- El `BaseController` extrae `@business_unit_id` del JWT en cada request
+- Los controllers aplican el scope: `Model.where(business_unit_id: @business_unit_id)`
+- Los sadmins (`User.sadmin?`) pueden pasar `?business_unit_id=X` para cambiar de BU
+- Los usuarios regulares siempre usan la BU de su JWT — ignoran cualquier param
+
+### Jerarquía de autorización por BU
+
+```text
+sadmin          → acceso a todas las BUs + panel de administración global
+admin           → su BU únicamente
+supervisor      → su BU, permisos según privileges
+operador        → su BU, permisos según privileges
 ```
 
-### Componentes Principales
+---
 
-#### 1. Controllers (Presentation Layer)
+## 3. Backend — Rails API
 
-**Responsabilidades:**
+### Estructura de carpetas clave
 
-- Recibir requests HTTP
-- Validar parámetros
-- Delegar lógica de negocio a Services
-- Retornar respuestas JSON
+```text
+ttpngas/
+├── app/
+│   ├── controllers/
+│   │   └── api/v1/
+│   │       ├── base_controller.rb         # JWT auth + business_unit_id
+│   │       ├── auth/                      # Login/logout de Users
+│   │       ├── client_auth/               # Login/logout de Employees (choferes)
+│   │       └── [dominio]_controller.rb    # Un controller por recurso
+│   │
+│   ├── models/                            # ~88 modelos ActiveRecord
+│   │
+│   ├── services/                          # Lógica de negocio compleja
+│   │   ├── dashboard_data_service.rb
+│   │   ├── ttpn_data_service.rb
+│   │   ├── queue_import.rb
+│   │   ├── alerts/
+│   │   │   ├── dispatcher_service.rb
+│   │   │   ├── email_sender_service.rb
+│   │   │   └── push_sender_service.rb
+│   │   ├── fuel_performance/
+│   │   │   ├── performers_ranker.rb
+│   │   │   ├── timeline_builder.rb
+│   │   │   └── vehicle_calculator.rb
+│   │   └── payroll_svc/
+│   │       ├── report_exporter.rb
+│   │       ├── report_query.rb
+│   │       └── week_calculator.rb
+│   │
+│   ├── jobs/                              # Sidekiq jobs
+│   │   ├── alert_dispatch_job.rb
+│   │   ├── dashboard_calculation_job.rb
+│   │   ├── dashboard_export_job.rb
+│   │   ├── deactivate_expired_versions_job.rb
+│   │   ├── doc_expiration_check_job.rb
+│   │   ├── ejecutar_script_python_job.rb
+│   │   ├── ttpn_booking_import_job.rb
+│   │   └── ttpn_calculation_job.rb
+│   │
+│   ├── mailers/
+│   │   ├── alert_mailer.rb
+│   │   ├── asignation_mailer.rb
+│   │   └── client_user_mailer.rb
+│   │
+│   └── channels/
+│       └── alerts_channel.rb              # WebSocket para notificaciones
+│
+├── config/
+│   ├── routes.rb                          # Solo draw calls
+│   └── routes/                            # Un archivo por dominio
+│       ├── auth.rb
+│       ├── dashboard.rb
+│       ├── vehicles.rb
+│       ├── employees.rb
+│       ├── clients.rb
+│       ├── bookings.rb
+│       ├── payroll.rb
+│       ├── fuel.rb
+│       ├── administration.rb
+│       └── alerts.rb
+│
+├── spec/
+│   ├── integration/api/v1/               # Specs principales (generan Swagger)
+│   ├── requests/api/v1/                  # Specs legacy
+│   └── support/
+│       ├── factory_bot.rb
+│       └── rack_attack.rb                # Reset rack-attack entre tests
+│
+└── scripts/
+    └── utils/db.py                        # Scripts Python (usan DATABASE_URL)
+```
 
-**Ejemplo:**
+### Patrón de Controller
+
+Todos heredan de `Api::V1::BaseController < ActionController::API`.
 
 ```ruby
 module Api
   module V1
     class VehiclesController < Api::V1::BaseController
-      before_action :authenticate_user!
-      before_action :set_vehicle, only: [:show, :update, :destroy]
+      before_action :set_vehicle, only: %i[show update destroy]
 
       def index
-        @vehicles = Vehicle.accessible_by(current_ability)
-                          .includes(:vehicle_type, :company)
-                          .page(params[:page])
-
+        @vehicles = Vehicle.where(business_unit_id: @business_unit_id)
+                           .includes(:vehicle_type)
+                           .page(params[:page])
         render json: @vehicles, each_serializer: VehicleSerializer
       end
 
       def create
-        result = Vehicles::CreateService.new(
-          vehicle_params,
-          current_user
-        ).call
-
-        if result.success?
-          render json: result.data, status: :created
+        @vehicle = Vehicle.new(vehicle_params.merge(business_unit_id: @business_unit_id))
+        if @vehicle.save
+          render json: @vehicle, serializer: VehicleSerializer, status: :created
         else
-          render json: { errors: result.errors }, status: :unprocessable_entity
+          render json: { errors: @vehicle.errors }, status: :unprocessable_entity
         end
       end
 
       private
 
+      def set_vehicle
+        @vehicle = Vehicle.where(business_unit_id: @business_unit_id).find(params[:id])
+      end
+
       def vehicle_params
-        params.require(:vehicle).permit(
-          :plates, :brand, :model, :year, :vehicle_type_id
-        )
+        params.require(:vehicle).permit(:plates, :brand, :model, :year, :vehicle_type_id)
       end
     end
   end
 end
 ```
 
-#### 2. Services (Business Logic Layer)
+**Reglas de controllers:**
 
-**Responsabilidades:**
+- Nunca lógica de negocio compleja — delegar a services
+- `params.permit!` está prohibido — siempre whitelist explícita
+- `find(params[:id])` siempre scoped a la BU del usuario (protección IDOR)
+- `before_action :authenticate_user!` en BaseController — no se repite en cada controller
 
-- Encapsular lógica de negocio compleja
-- Coordinar múltiples modelos
-- Manejar transacciones
-- Interactuar con servicios externos
+### Patrón de Service
 
-**Patrón de Service Object:**
+Para lógica que involucra múltiples modelos, transacciones o servicios externos:
 
 ```ruby
-module Vehicles
-  class CreateService
-    def initialize(params, current_user)
-      @params = params
-      @current_user = current_user
+module PayrollSvc
+  class WeekCalculator
+    def initialize(business_unit_id:, week:)
+      @business_unit_id = business_unit_id
+      @week = week
     end
 
     def call
-      ActiveRecord::Base.transaction do
-        vehicle = create_vehicle
-        assign_to_company(vehicle)
-        schedule_maintenance(vehicle)
-        notify_admin(vehicle)
-
-        ServiceResult.success(vehicle)
-      end
-    rescue ActiveRecord::RecordInvalid => e
-      ServiceResult.failure(e.record.errors)
-    rescue StandardError => e
-      Rails.logger.error("Vehicle creation failed: #{e.message}")
-      ServiceResult.failure(['Error creating vehicle'])
-    end
-
-    private
-
-    def create_vehicle
-      Vehicle.create!(@params.merge(created_by: @current_user))
-    end
-
-    def assign_to_company(vehicle)
-      vehicle.update!(company_id: @current_user.company_id)
-    end
-
-    def schedule_maintenance(vehicle)
-      Maintenances::ScheduleJob.perform_later(vehicle.id)
-    end
-
-    def notify_admin(vehicle)
-      AdminMailer.new_vehicle(vehicle).deliver_later
+      # Lógica de negocio aquí
+      # Puede lanzar excepciones — el controller las rescata
     end
   end
 end
+
+# En el controller:
+def calculate
+  result = PayrollSvc::WeekCalculator.new(
+    business_unit_id: @business_unit_id,
+    week: params[:week]
+  ).call
+  render json: result
+rescue ArgumentError => e
+  render json: { error: e.message }, status: :unprocessable_entity
+end
 ```
 
-#### 3. Models (Data Access Layer)
+### Auditoría automática
 
-**Responsabilidades:**
+Las tablas principales tienen `created_by_id` y `updated_by_id`. El `BaseController` los asigna automáticamente en cada create/update via concern. No es necesario pasarlos manualmente desde el controller.
 
-- Validaciones de datos
-- Asociaciones entre modelos
-- Scopes y queries
-- Callbacks (usar con moderación)
+---
 
-**Ejemplo:**
+## 4. Autenticación — Tres Canales Separados
+
+El sistema tiene **tres formas distintas de autenticarse**, cada una con su propio namespace y lógica:
+
+### Canal 1: User JWT (panel admin)
+
+- Ruta: `POST /api/v1/auth/sign_in`
+- Modelo: `User` (Devise)
+- Token firmado con `DEVISE_JWT_SECRET_KEY`
+- Payload incluye: `user_id`, `jti`, `role`, objeto `privileges`
+- Expiración: configurable (por defecto 24h)
+- Revocación: regenerar `jti` en logout → token anterior queda inválido
+
+### Canal 2: Employee JWT (app móvil de choferes)
+
+- Ruta: `POST /api/v1/client_auth/sign_in`
+- Modelo: `Employee`
+- Namespace de rutas completamente separado de los Users
+- Token **incompatible** con el canal de Users — no funciona en endpoints de admin y viceversa
+- Payload incluye: `employee_id`, `jti`, permisos limitados
+
+### Canal 3: API Key (N8N y apps externas)
+
+- Header: `X-Api-Key: <key>`
+- Modelos: `ApiUser` + `ApiKey`
+- Las keys se crean desde el panel admin en Kumi → Configuración → API Keys
+- El `ApiUser` representa la aplicación cliente (N8N, portal externo, etc.)
+- Rotación semestral — ver `INFRA/seguridad/rotacion_api_keys.md`
+
+### Brute Force — Devise Lockable (implementación manual)
+
+Devise Lockable no funciona automáticamente con JWT (requiere Warden). Implementado manualmente en el `sessions_controller`:
+
+- 10 intentos fallidos → cuenta bloqueada 1 hora
+- Campos en tabla `users`: `failed_attempts`, `locked_at`, `unlock_token`
+- Respuesta en cuenta bloqueada: `423 Locked` con tiempo restante
+
+---
+
+## 5. Autorización — Pundit + Privileges
+
+### Pundit Policies
+
+La autorización a nivel de recurso usa **Pundit**. Cada modelo tiene su policy en `app/policies/`.
 
 ```ruby
-class Vehicle < ApplicationRecord
-  # Associations
-  belongs_to :vehicle_type
-  belongs_to :company
-  has_many :maintenances, dependent: :destroy
-  has_many :vehicle_documents, dependent: :destroy
-
-  # Validations
-  validates :plates, presence: true, uniqueness: { case_sensitive: false }
-  validates :brand, :model, :year, presence: true
-  validates :year, numericality: {
-    only_integer: true,
-    greater_than: 1900,
-    less_than_or_equal_to: -> { Date.current.year + 1 }
-  }
-
-  # Scopes
-  scope :active, -> { where(active: true) }
-  scope :by_company, ->(company_id) { where(company_id: company_id) }
-  scope :recent, -> { order(created_at: :desc) }
-
-  # Callbacks
-  before_save :normalize_plates
-  after_create :create_initial_documents
-
-  # Instance methods
-  def full_name
-    "#{brand} #{model} (#{year})"
+# app/policies/vehicle_policy.rb
+class VehiclePolicy < ApplicationPolicy
+  def update?
+    user.admin? || record.business_unit_id == user.business_unit_id
   end
+end
 
-  def needs_maintenance?
-    last_maintenance = maintenances.order(date: :desc).first
-    return true if last_maintenance.nil?
-
-    last_maintenance.date < 6.months.ago
-  end
-
-  private
-
-  def normalize_plates
-    self.plates = plates.upcase.strip
-  end
-
-  def create_initial_documents
-    VehicleDocumentType.all.each do |doc_type|
-      vehicle_documents.create!(document_type: doc_type)
-    end
-  end
+# En el controller:
+def update
+  authorize @vehicle
+  # ...
 end
 ```
 
-#### 4. Serializers
+### Objeto Privileges en JWT
 
-**Responsabilidades:**
-
-- Formatear datos para respuestas JSON
-- Incluir/excluir campos según contexto
-- Manejar relaciones anidadas
-
-**Ejemplo:**
-
-```ruby
-class VehicleSerializer
-  def initialize(vehicle, options = {})
-    @vehicle = vehicle
-    @options = options
-  end
-
-  def as_json
-    {
-      id: @vehicle.id,
-      plates: @vehicle.plates,
-      brand: @vehicle.brand,
-      model: @vehicle.model,
-      year: @vehicle.year,
-      full_name: @vehicle.full_name,
-      active: @vehicle.active,
-      vehicle_type: vehicle_type_data,
-      company: company_data,
-      maintenances_count: @vehicle.maintenances.count,
-      needs_maintenance: @vehicle.needs_maintenance?,
-      created_at: @vehicle.created_at,
-      updated_at: @vehicle.updated_at
-    }.tap do |hash|
-      hash[:maintenances] = maintenances_data if include_maintenances?
-    end
-  end
-
-  private
-
-  def vehicle_type_data
-    return nil unless @vehicle.vehicle_type
-
-    {
-      id: @vehicle.vehicle_type.id,
-      name: @vehicle.vehicle_type.name
-    }
-  end
-
-  def company_data
-    return nil unless @vehicle.company
-
-    {
-      id: @vehicle.company.id,
-      name: @vehicle.company.name
-    }
-  end
-
-  def maintenances_data
-    @vehicle.maintenances.recent.map do |maintenance|
-      MaintenanceSerializer.new(maintenance).as_json
-    end
-  end
-
-  def include_maintenances?
-    @options[:include_maintenances] == true
-  end
-end
-```
-
-### API Endpoints
-
-#### Convenciones de Rutas
-
-```ruby
-# config/routes.rb
-namespace :api, defaults: { format: :json } do
-  namespace :v1 do
-    resources :vehicles do
-      member do
-        post :activate
-        post :deactivate
-      end
-
-      collection do
-        get :search
-        get :export
-      end
-
-      resources :maintenances, only: [:index, :create]
-    end
-  end
-end
-```
-
-**Rutas Generadas:**
-
-```
-GET    /api/v1/vehicles              # index
-POST   /api/v1/vehicles              # create
-GET    /api/v1/vehicles/:id          # show
-PATCH  /api/v1/vehicles/:id          # update
-DELETE /api/v1/vehicles/:id          # destroy
-POST   /api/v1/vehicles/:id/activate # custom action
-GET    /api/v1/vehicles/search       # collection action
-GET    /api/v1/vehicles/:vehicle_id/maintenances
-```
-
-#### Formato de Respuestas
-
-**Éxito:**
+El payload del JWT incluye un objeto `privileges` con permisos por módulo:
 
 ```json
 {
-  "id": 1,
-  "plates": "ABC123",
-  "brand": "Toyota",
-  "model": "Corolla",
-  "year": 2023,
-  "active": true,
-  "created_at": "2025-01-15T10:30:00Z",
-  "updated_at": "2025-01-15T10:30:00Z"
-}
-```
-
-**Error:**
-
-```json
-{
-  "errors": {
-    "plates": ["can't be blank"],
-    "year": ["must be greater than 1900"]
+  "user_id": 42,
+  "privileges": {
+    "vehicles": { "read": true, "create": true, "update": true, "delete": false },
+    "payroll":  { "read": true, "create": false, "update": false, "delete": false },
+    "employees": { "read": true, "create": true, "update": true, "delete": false }
   }
 }
 ```
 
-**Paginación:**
+El frontend lee este objeto para mostrar/ocultar botones y rutas. El backend también lo verifica antes de operaciones sensibles.
 
-```json
-{
-  "data": [...],
-  "meta": {
-    "current_page": 1,
-    "total_pages": 10,
-    "total_count": 95,
-    "per_page": 10
-  }
-}
+**Regla:** Nunca `role_id` hardcodeado en frontend ni backend. Siempre leer del objeto `privileges`.
+
+---
+
+## 6. Jobs en Background — Sidekiq
+
+### Servicios en Railway
+
+| Servicio | Queues | Start command |
+| --- | --- | --- |
+| `kumi_sidekiq` | default, payrolls, alerts, mailers | `bundle exec sidekiq -c 10 -q default -q payrolls -q alerts -q mailers` |
+
+### Jobs existentes
+
+| Job | Queue | Propósito |
+| --- | --- | --- |
+| `AlertDispatchJob` | alerts | Evalúa reglas y crea alertas |
+| `DashboardCalculationJob` | default | Precalcula KPIs del dashboard |
+| `DashboardExportJob` | default | Exporta dashboard a Excel/PDF |
+| `DeactivateExpiredVersionsJob` | default | Desactiva versiones de app vencidas |
+| `DocExpirationCheckJob` | default | Verifica documentos vencidos y alerta |
+| `EjecutarScriptPythonJob` | default | Ejecuta scripts Python de análisis |
+| `TtpnBookingImportJob` | default | Importación masiva de bookings |
+| `TtpnCalculationJob` | default | Calcula cuadre de viajes |
+
+### Jobs programados (sidekiq-cron)
+
+Configurados en `config/initializers/sidekiq.rb`. Se ejecutan en el worker `kumi_sidekiq`, no en la API web.
+
+### Patrón de Job
+
+```ruby
+class DocExpirationCheckJob < ApplicationJob
+  queue_as :default
+
+  def perform(business_unit_id)
+    # Procesar documentos de esa BU
+    # Si hay error, Sidekiq reintenta automáticamente (3 veces por defecto)
+  end
+end
+
+# Encolar desde un controller:
+DocExpirationCheckJob.perform_later(@business_unit_id)
 ```
 
 ---
 
-## 🔵 Frontend (Quasar PWA)
+## 7. Tiempo Real — ActionCable
 
-### Arquitectura de Componentes
+Las notificaciones de alertas se entregan via WebSocket usando **ActionCable**.
 
-```
-src/
-├── layouts/
-│   ├── MainLayout.vue          # Layout principal con sidebar
-│   └── AuthLayout.vue          # Layout para login/registro
-├── pages/
-│   ├── vehicles/
-│   │   ├── VehiclesPage.vue    # Lista de vehículos
-│   │   ├── VehicleDetail.vue   # Detalle de vehículo
-│   │   └── VehicleForm.vue     # Formulario crear/editar
-│   └── dashboard/
-│       └── DashboardPage.vue
-├── components/
-│   ├── vehicles/
-│   │   ├── VehicleCard.vue     # Card de vehículo
-│   │   ├── VehicleFilters.vue  # Filtros
-│   │   └── VehicleTable.vue    # Tabla
-│   └── common/
-│       ├── AppHeader.vue
-│       ├── AppSidebar.vue
-│       └── LoadingSpinner.vue
-├── stores/
-│   ├── auth.js                 # Estado de autenticación
-│   ├── vehicles.js             # Estado de vehículos
-│   └── ui.js                   # Estado de UI (sidebar, etc)
-├── router/
-│   └── routes.js               # Configuración de rutas
-└── boot/
-    ├── axios.js                # Configuración de Axios
-    └── auth.js                 # Inicialización de auth
+### Flujo
+
+```text
+AlertDispatchJob crea Alert
+       │
+       └── AlertsChannel.broadcast_to(user, alert_data)
+               │
+               └── Frontend: cable.subscribe({ channel: 'AlertsChannel' })
+                       │
+                       └── AlertBell.vue actualiza badge en tiempo real
 ```
 
-### Pinia Stores (Estado Global)
+### Autenticación WebSocket
 
-**Estructura de Store:**
+El token JWT se pasa como parámetro en la conexión WebSocket. El `ApplicationCable::Connection` lo valida igual que los controllers HTTP.
 
 ```javascript
-// src/stores/vehicles.js
-import { defineStore } from "pinia";
-import { api } from "boot/axios";
-import { Notify } from "quasar";
-
-export const useVehicleStore = defineStore("vehicles", {
-  state: () => ({
-    vehicles: [],
-    currentVehicle: null,
-    loading: false,
-    error: null,
-    filters: {
-      search: "",
-      active: null,
-      vehicleTypeId: null,
-    },
-    pagination: {
-      page: 1,
-      perPage: 10,
-      totalPages: 1,
-      totalCount: 0,
-    },
-  }),
-
-  getters: {
-    activeVehicles: (state) => {
-      return state.vehicles.filter((v) => v.active);
-    },
-
-    filteredVehicles: (state) => {
-      let filtered = state.vehicles;
-
-      if (state.filters.search) {
-        const search = state.filters.search.toLowerCase();
-        filtered = filtered.filter(
-          (v) =>
-            v.plates.toLowerCase().includes(search) ||
-            v.brand.toLowerCase().includes(search) ||
-            v.model.toLowerCase().includes(search)
-        );
-      }
-
-      if (state.filters.active !== null) {
-        filtered = filtered.filter((v) => v.active === state.filters.active);
-      }
-
-      if (state.filters.vehicleTypeId) {
-        filtered = filtered.filter(
-          (v) => v.vehicle_type?.id === state.filters.vehicleTypeId
-        );
-      }
-
-      return filtered;
-    },
-
-    getVehicleById: (state) => (id) => {
-      return state.vehicles.find((v) => v.id === id);
-    },
-  },
-
-  actions: {
-    async fetchVehicles(page = 1) {
-      this.loading = true;
-      this.error = null;
-
-      try {
-        const response = await api.get("/api/v1/vehicles", {
-          params: {
-            page,
-            per_page: this.pagination.perPage,
-            ...this.filters,
-          },
-        });
-
-        this.vehicles = response.data.data || response.data;
-
-        if (response.data.meta) {
-          this.pagination = {
-            ...this.pagination,
-            ...response.data.meta,
-          };
-        }
-      } catch (error) {
-        this.error = error.message;
-        Notify.create({
-          type: "negative",
-          message: "Error al cargar vehículos",
-          caption: error.message,
-        });
-      } finally {
-        this.loading = false;
-      }
-    },
-
-    async fetchVehicle(id) {
-      this.loading = true;
-
-      try {
-        const response = await api.get(`/api/v1/vehicles/${id}`);
-        this.currentVehicle = response.data;
-        return response.data;
-      } catch (error) {
-        this.error = error.message;
-        throw error;
-      } finally {
-        this.loading = false;
-      }
-    },
-
-    async createVehicle(vehicleData) {
-      try {
-        const response = await api.post("/api/v1/vehicles", {
-          vehicle: vehicleData,
-        });
-
-        this.vehicles.unshift(response.data);
-
-        Notify.create({
-          type: "positive",
-          message: "Vehículo creado exitosamente",
-        });
-
-        return response.data;
-      } catch (error) {
-        const errorMessage = error.response?.data?.errors || error.message;
-
-        Notify.create({
-          type: "negative",
-          message: "Error al crear vehículo",
-          caption: JSON.stringify(errorMessage),
-        });
-
-        throw error;
-      }
-    },
-
-    async updateVehicle(id, vehicleData) {
-      try {
-        const response = await api.put(`/api/v1/vehicles/${id}`, {
-          vehicle: vehicleData,
-        });
-
-        const index = this.vehicles.findIndex((v) => v.id === id);
-        if (index !== -1) {
-          this.vehicles[index] = response.data;
-        }
-
-        if (this.currentVehicle?.id === id) {
-          this.currentVehicle = response.data;
-        }
-
-        Notify.create({
-          type: "positive",
-          message: "Vehículo actualizado exitosamente",
-        });
-
-        return response.data;
-      } catch (error) {
-        Notify.create({
-          type: "negative",
-          message: "Error al actualizar vehículo",
-        });
-        throw error;
-      }
-    },
-
-    async deleteVehicle(id) {
-      try {
-        await api.delete(`/api/v1/vehicles/${id}`);
-
-        this.vehicles = this.vehicles.filter((v) => v.id !== id);
-
-        Notify.create({
-          type: "positive",
-          message: "Vehículo eliminado exitosamente",
-        });
-      } catch (error) {
-        Notify.create({
-          type: "negative",
-          message: "Error al eliminar vehículo",
-        });
-        throw error;
-      }
-    },
-
-    setFilters(filters) {
-      this.filters = { ...this.filters, ...filters };
-      this.fetchVehicles(1); // Reset to page 1 when filtering
-    },
-
-    clearFilters() {
-      this.filters = {
-        search: "",
-        active: null,
-        vehicleTypeId: null,
-      };
-      this.fetchVehicles(1);
-    },
-  },
-
-  persist: {
-    enabled: true,
-    strategies: [
-      {
-        key: "vehicles",
-        storage: localStorage,
-        paths: ["filters", "pagination.perPage"],
-      },
-    ],
-  },
-});
-```
-
-### Componentes Vue
-
-**Ejemplo de Página:**
-
-```vue
-<!-- src/pages/vehicles/VehiclesPage.vue -->
-<template>
-  <q-page padding>
-    <div class="row items-center q-mb-md">
-      <div class="col">
-        <div class="text-h4">Vehículos</div>
-      </div>
-      <div class="col-auto">
-        <q-btn
-          color="primary"
-          label="Nuevo Vehículo"
-          icon="add"
-          @click="showCreateDialog = true"
-        />
-      </div>
-    </div>
-
-    <vehicle-filters @filter="handleFilter" />
-
-    <vehicle-table
-      :vehicles="filteredVehicles"
-      :loading="loading"
-      @edit="handleEdit"
-      @delete="handleDelete"
-    />
-
-    <div class="row justify-center q-mt-md">
-      <q-pagination
-        v-model="currentPage"
-        :max="totalPages"
-        direction-links
-        @update:model-value="handlePageChange"
-      />
-    </div>
-
-    <vehicle-form-dialog v-model="showCreateDialog" @submit="handleCreate" />
-  </q-page>
-</template>
-
-<script setup>
-import { ref, computed, onMounted } from "vue";
-import { useVehicleStore } from "stores/vehicles";
-import { useQuasar } from "quasar";
-import VehicleFilters from "components/vehicles/VehicleFilters.vue";
-import VehicleTable from "components/vehicles/VehicleTable.vue";
-import VehicleFormDialog from "components/vehicles/VehicleFormDialog.vue";
-
-const $q = useQuasar();
-const vehicleStore = useVehicleStore();
-
-const showCreateDialog = ref(false);
-const currentPage = ref(1);
-
-const filteredVehicles = computed(() => vehicleStore.filteredVehicles);
-const loading = computed(() => vehicleStore.loading);
-const totalPages = computed(() => vehicleStore.pagination.totalPages);
-
-onMounted(() => {
-  vehicleStore.fetchVehicles();
-});
-
-const handleFilter = (filters) => {
-  vehicleStore.setFilters(filters);
-};
-
-const handlePageChange = (page) => {
-  vehicleStore.fetchVehicles(page);
-};
-
-const handleCreate = async (vehicleData) => {
-  try {
-    await vehicleStore.createVehicle(vehicleData);
-    showCreateDialog.value = false;
-  } catch (error) {
-    console.error("Error creating vehicle:", error);
-  }
-};
-
-const handleEdit = (vehicle) => {
-  // Navigate to edit page or show edit dialog
-  $q.notify({
-    message: `Editar vehículo ${vehicle.plates}`,
-    color: "info",
-  });
-};
-
-const handleDelete = (vehicleId) => {
-  $q.dialog({
-    title: "Confirmar",
-    message: "¿Estás seguro de eliminar este vehículo?",
-    cancel: true,
-    persistent: true,
-  }).onOk(async () => {
-    try {
-      await vehicleStore.deleteVehicle(vehicleId);
-    } catch (error) {
-      console.error("Error deleting vehicle:", error);
-    }
-  });
-};
-</script>
-```
-
-### Configuración de Axios
-
-```javascript
-// src/boot/axios.js
-import { boot } from "quasar/wrappers";
-import axios from "axios";
-import { useAuthStore } from "stores/auth";
-import { Notify } from "quasar";
-
-const api = axios.create({
-  baseURL: process.env.API_URL || "http://localhost:3000",
-  timeout: 30000,
-  headers: {
-    "Content-Type": "application/json",
-    Accept: "application/json",
-  },
-});
-
-export default boot(({ app, router }) => {
-  // Request interceptor
-  api.interceptors.request.use(
-    (config) => {
-      const authStore = useAuthStore();
-
-      if (authStore.token) {
-        config.headers.Authorization = `Bearer ${authStore.token}`;
-      }
-
-      return config;
-    },
-    (error) => {
-      return Promise.reject(error);
-    }
-  );
-
-  // Response interceptor
-  api.interceptors.response.use(
-    (response) => {
-      return response;
-    },
-    (error) => {
-      if (error.response) {
-        switch (error.response.status) {
-          case 401:
-            // Unauthorized - redirect to login
-            const authStore = useAuthStore();
-            authStore.logout();
-            router.push("/login");
-
-            Notify.create({
-              type: "negative",
-              message: "Sesión expirada",
-              caption: "Por favor inicia sesión nuevamente",
-            });
-            break;
-
-          case 403:
-            Notify.create({
-              type: "negative",
-              message: "Acceso denegado",
-              caption: "No tienes permisos para realizar esta acción",
-            });
-            break;
-
-          case 404:
-            Notify.create({
-              type: "negative",
-              message: "Recurso no encontrado",
-            });
-            break;
-
-          case 422:
-            // Validation errors - handled by individual components
-            break;
-
-          case 500:
-            Notify.create({
-              type: "negative",
-              message: "Error del servidor",
-              caption: "Por favor intenta nuevamente más tarde",
-            });
-            break;
-
-          default:
-            Notify.create({
-              type: "negative",
-              message: "Error inesperado",
-              caption: error.message,
-            });
-        }
-      } else if (error.request) {
-        Notify.create({
-          type: "negative",
-          message: "Error de conexión",
-          caption: "No se pudo conectar con el servidor",
-        });
-      }
-
-      return Promise.reject(error);
-    }
-  );
-
-  app.config.globalProperties.$axios = axios;
-  app.config.globalProperties.$api = api;
-});
-
-export { api };
+// src/boot/cable.js
+createConsumer(`wss://api.kumi.ttpn.com.mx/cable?token=${jwt}`)
 ```
 
 ---
 
-## 🗄️ Base de Datos
-
-### Esquema Principal
-
-```sql
--- Usuarios y Autenticación
-users
-  - id (PK)
-  - email (unique)
-  - encrypted_password
-  - name
-  - role_id (FK)
-  - company_id (FK)
-  - active
-  - created_at
-  - updated_at
-
-roles
-  - id (PK)
-  - name
-  - description
-  - permissions (jsonb)
-
--- Empresas y Sucursales
-companies
-  - id (PK)
-  - name
-  - rfc
-  - address
-  - active
-  - created_at
-  - updated_at
-
-company_subsidiaries
-  - id (PK)
-  - company_id (FK)
-  - name
-  - address
-  - phone
-  - active
-
--- Vehículos
-vehicles
-  - id (PK)
-  - plates (unique)
-  - brand
-  - model
-  - year
-  - vehicle_type_id (FK)
-  - company_id (FK)
-  - active
-  - created_at
-  - updated_at
-
-vehicle_types
-  - id (PK)
-  - name
-  - description
-  - capacity
-
--- Mantenimientos
-maintenances
-  - id (PK)
-  - vehicle_id (FK)
-  - company_subsidiary_id (FK)
-  - date
-  - type
-  - description
-  - cost
-  - created_at
-  - updated_at
-
--- Clientes
-clients
-  - id (PK)
-  - name
-  - email
-  - phone
-  - company_id (FK)
-  - active
-  - black_list
-  - black_list_description
-  - created_at
-  - updated_at
-
--- Empleados
-employees
-  - id (PK)
-  - name
-  - email
-  - phone
-  - position
-  - company_id (FK)
-  - active
-  - created_at
-  - updated_at
-```
-
-### Índices Importantes
-
-```sql
--- Índices para búsquedas frecuentes
-CREATE INDEX idx_vehicles_company ON vehicles(company_id);
-CREATE INDEX idx_vehicles_active ON vehicles(active);
-CREATE INDEX idx_vehicles_plates ON vehicles(plates);
-
-CREATE INDEX idx_users_email ON users(email);
-CREATE INDEX idx_users_company ON users(company_id);
-
-CREATE INDEX idx_maintenances_vehicle ON maintenances(vehicle_id);
-CREATE INDEX idx_maintenances_date ON maintenances(date);
-
--- Índices compuestos
-CREATE INDEX idx_vehicles_company_active ON vehicles(company_id, active);
-CREATE INDEX idx_maintenances_vehicle_date ON maintenances(vehicle_id, date DESC);
-```
-
-### Migraciones
-
-**Ejemplo de Migración:**
-
-```ruby
-class CreateVehicles < ActiveRecord::Migration[7.1]
-  def change
-    create_table :vehicles do |t|
-      t.string :plates, null: false
-      t.string :brand, null: false
-      t.string :model, null: false
-      t.integer :year, null: false
-      t.references :vehicle_type, null: false, foreign_key: true
-      t.references :company, null: false, foreign_key: true
-      t.boolean :active, default: true, null: false
-
-      t.timestamps
-    end
-
-    add_index :vehicles, :plates, unique: true
-    add_index :vehicles, [:company_id, :active]
-  end
-end
-```
-
----
-
-## 🔐 Autenticación y Autorización
-
-### JWT Authentication
-
-**Flujo de Autenticación:**
-
-```
-1. Usuario envía credenciales → POST /api/v1/auth/login
-2. Backend valida credenciales
-3. Backend genera JWT token
-4. Frontend guarda token en localStorage
-5. Frontend envía token en cada request: Authorization: Bearer <token>
-6. Backend valida token en cada request
-```
-
-**Implementación:**
-
-```ruby
-# app/controllers/api/v1/auth_controller.rb
-module Api
-  module V1
-    class AuthController < ApplicationController
-      skip_before_action :authenticate_user!, only: [:login]
-
-      def login
-        user = User.find_by(email: params[:email])
-
-        if user&.valid_password?(params[:password])
-          token = JsonWebToken.encode(user_id: user.id)
-
-          render json: {
-            token: token,
-            user: UserSerializer.new(user).as_json
-          }, status: :ok
-        else
-          render json: { error: 'Invalid credentials' }, status: :unauthorized
-        end
-      end
-
-      def logout
-        # Invalidate token (implement token blacklist if needed)
-        head :no_content
-      end
-    end
-  end
-end
-
-# lib/json_web_token.rb
-class JsonWebToken
-  SECRET_KEY = Rails.application.credentials.secret_key_base
-
-  def self.encode(payload, exp = 24.hours.from_now)
-    payload[:exp] = exp.to_i
-    JWT.encode(payload, SECRET_KEY)
-  end
-
-  def self.decode(token)
-    decoded = JWT.decode(token, SECRET_KEY)[0]
-    HashWithIndifferentAccess.new(decoded)
-  rescue JWT::DecodeError => e
-    nil
-  end
-end
-```
-
-### CanCanCan Authorization
-
-**Definición de Abilities:**
-
-```ruby
-# app/models/ability.rb
-class Ability
-  include CanCan::Ability
-
-  def initialize(user)
-    user ||= User.new # guest user
-
-    case user.role&.name
-    when 'SuperAdmin'
-      can :manage, :all
-
-    when 'Admin'
-      can :manage, :all, company_id: user.company_id
-      cannot :destroy, Company
-
-    when 'Manager'
-      can :read, :all, company_id: user.company_id
-      can :manage, Vehicle, company_id: user.company_id
-      can :manage, Maintenance, company_id: user.company_id
-
-    when 'User'
-      can :read, Vehicle, company_id: user.company_id
-      can :read, Maintenance, company_id: user.company_id
-
-    else
-      # Guest user
-      can :read, :public_data
-    end
-  end
-end
-```
-
-**Uso en Controladores:**
-
-```ruby
-class VehiclesController < ApplicationController
-  load_and_authorize_resource
-
-  def index
-    @vehicles = @vehicles.accessible_by(current_ability)
-    render json: @vehicles
-  end
-end
-```
-
----
-
-## ⚙️ Jobs en Background (Sidekiq)
+## 8. Almacenamiento — ActiveStorage + AWS S3
 
 ### Configuración
 
-```yaml
-# config/sidekiq.yml
-:concurrency: 10
-:timeout: 25
-:queues:
-  - critical
-  - default
-  - mailers
-  - low_priority
+| Entorno | Backend | Configuración |
+| --- | --- | --- |
+| Desarrollo | Disco local | `config/storage.yml → local` |
+| Producción | AWS S3 | bucket `ttpngas-production`, región `us-east-2` |
 
-:schedule:
-  check_maintenances:
-    cron: "0 2 * * *" # Diario a las 2 AM
-    class: CheckMaintenancesJob
-    queue: default
+### Variables de entorno (producción)
 
-  generate_reports:
-    cron: "0 0 * * 0" # Semanal, domingos a medianoche
-    class: GenerateWeeklyReportsJob
-    queue: low_priority
+```bash
+AWS_ACCESS_KEY_ID=...
+AWS_SECRET_ACCESS_KEY=...
+AWS_REGION=us-east-2
+AWS_BUCKET_NAME=ttpngas-production
 ```
 
-### Ejemplo de Worker
+Las credenciales se rotan semestralmente. Ver `INFRA/seguridad/rotacion_api_keys.md`.
+
+### Uso
 
 ```ruby
-# app/workers/send_maintenance_reminder_worker.rb
-class SendMaintenanceReminderWorker
-  include Sidekiq::Worker
+class VehicleDocument < ApplicationRecord
+  has_one_attached :file
 
-  sidekiq_options queue: :default, retry: 3
-
-  def perform(vehicle_id)
-    vehicle = Vehicle.find(vehicle_id)
-
-    return unless vehicle.needs_maintenance?
-
-    # Enviar email
-    MaintenanceMailer.reminder(vehicle).deliver_now
-
-    # Crear notificación en la app
-    Notification.create!(
-      user: vehicle.company.admin,
-      title: 'Mantenimiento Requerido',
-      message: "El vehículo #{vehicle.plates} requiere mantenimiento",
-      vehicle: vehicle
-    )
-
-    # Log
-    Rails.logger.info("Maintenance reminder sent for vehicle #{vehicle.id}")
-  end
-end
-```
-
-### Jobs Programados
-
-```ruby
-# app/jobs/check_maintenances_job.rb
-class CheckMaintenancesJob < ApplicationJob
-  queue_as :default
-
-  def perform
-    Vehicle.active.find_each do |vehicle|
-      next unless vehicle.needs_maintenance?
-
-      SendMaintenanceReminderWorker.perform_async(vehicle.id)
-    end
+  def file_url
+    Rails.application.routes.url_helpers.rails_blob_url(file, only_path: false)
   end
 end
 ```
 
 ---
 
-## 💾 Caching
+## 9. Base de Datos — PostgreSQL vía Supabase
 
-### Estrategia de Cache
+### Categorías de modelos
+
+| Dominio | Modelos principales |
+| --- | --- |
+| Tenancy | `BusinessUnit` |
+| Auth Admin | `User`, `Role`, `Privilege` |
+| Auth Móvil | `Employee` (Devise) |
+| Auth Externo | `ApiUser`, `ApiKey` |
+| Vehículos | `Vehicle`, `VehicleType`, `VehicleAsignation`, `VehicleCheck`, `VehicleDocument` |
+| Empleados | `Employee`, `EmployeeVacation`, `EmployeeAppointment`, `EmployeeDeduction`, `DriversLevel`, `Labor` |
+| Clientes | `Client`, `ClientBranchOffice`, `ClientUser` |
+| Viajes TTPN | `TtpnBooking`, `TravelCount`, `TtpnService`, `TtpnServiceType`, `Concessionaire` |
+| Nómina | `Payroll`, `PayrollItem`, `Invoicing`, `InvoiceType`, `KumiSetting` |
+| Combustible | `GasCharge`, `GasFile`, `GasStation`, `GasolineCharge`, `FuelPerformanceCache` |
+| Alertas | `Alert`, `AlertRule`, `AlertRuleRecipient`, `AlertDelivery`, `AlertRead`, `AlertContact` |
+| Catálogos | `Supplier`, `Discrepancy`, `ReviewPoint` |
+| Versiones | `AppVersion` |
+
+### Funciones PostgreSQL
+
+Las funciones PG encapsulan lógica de cuadre de viajes y son la fuente de verdad:
+
+| Función | Propósito |
+| --- | --- |
+| `buscar_booking(clv, ventana)` | Busca el TtpnBooking correspondiente a un TravelCount (±15 min) |
+| `buscar_nomina(employee_id, fecha)` | Encuentra la Payroll activa que debe absorber un TravelCount |
+| `sp_tctb_insert()` | Trigger BEFORE INSERT en travel_counts — calcula cuadre automático |
+
+### Trigger `sp_tctb_insert()`
+
+Se ejecuta en cada INSERT a `travel_counts` (tanto desde Rails como desde PHP legacy):
+
+1. Construye `clv_servicio` si llega NULL (inserts PHP)
+2. Defaultea `created_by_id`/`updated_by_id` a `1` si llegan NULL
+3. Calcula `viaje_encontrado` y `ttpn_booking_id` via `buscar_booking()`
+
+**No duplicar esta lógica en Ruby** — el trigger es la fuente de verdad.
+
+### Conexión en producción
+
+Railway usa `DATABASE_URL` de Supabase (modo Session de pgbouncer, port 5432). Los scripts Python usan la misma variable.
+
+```bash
+DATABASE_URL=postgresql://postgres.[project]:[password]@[host]:5432/postgres
+```
+
+---
+
+## 10. Automatización — N8N
+
+N8N está self-hosted en Railway como servicio separado. **No conecta a la base de datos directamente.**
+
+### Flujo de integración
+
+```text
+N8N Workflow
+     │
+     └── HTTP POST https://api.kumi.ttpn.com.mx/api/v1/[endpoint]
+             │  Header: X-Api-Key: <api_key>
+             │
+             └── Rails ApiKey middleware valida la key
+                     │
+                     └── Controller ejecuta la lógica normal
+```
+
+### Cómo crear una integración N8N
+
+1. Kumi Admin → Configuración → API Keys → crear nueva key para "N8N"
+2. En N8N: crear credencial tipo "Header Auth" con nombre `X-Api-Key` y el valor de la key
+3. En cada nodo HTTP de N8N: usar la credencial creada
+4. Las keys se rotan semestralmente desde el panel admin
+
+---
+
+## 11. Seguridad — Capas Implementadas
+
+### Capa 1: Rate Limiting — rack-attack
+
+| Throttle | Límite | Período | Key |
+| --- | --- | --- | --- |
+| Login (`/sign_in`) | 5 req | 20 seg | IP |
+| API general (`/api/`, `/auth/`) | 300 req | 5 min | IP |
+| API autenticada (header `Authorization`) | 600 req | 5 min | Token |
+| Blocklist brute force | 20+ intentos | — | IP bloqueada 1h |
+
+- Backend: Redis (namespace `rack_attack`)
+- En tests: `MemoryStore` + `Rack::Attack.reset!` antes de cada spec
+- Respuesta: `429 Too Many Requests` + header `Retry-After` + body JSON
+
+### Capa 2: Request Timeout — rack-timeout
+
+Configuración solo por env vars (rack-timeout 0.7.x eliminó setters de clase):
+
+```bash
+RACK_TIMEOUT_SERVICE_TIMEOUT=25   # abort request después de 25s
+RACK_TIMEOUT_WAIT_TIMEOUT=30      # abort si request espera >30s en cola
+```
+
+### Capa 3: Account Lockout — Devise Lockable
+
+- 10 intentos fallidos → cuenta bloqueada 1 hora
+- Implementación manual en `sessions_controller` (Lockable no funciona con JWT automáticamente)
+- Campos: `failed_attempts`, `locked_at`, `unlock_token` en tabla `users`
+
+### Capa 4: IDOR Prevention
+
+Todos los `find(params[:id])` están scoped a la BU del usuario:
 
 ```ruby
-# config/environments/production.rb
-config.cache_store = :redis_cache_store, {
-  url: ENV['REDIS_URL'],
-  expires_in: 1.hour,
-  namespace: 'ttpngas'
+# Nunca hacer:
+@record = Model.find(params[:id])
+
+# Siempre:
+@record = Model.where(business_unit_id: @business_unit_id).find(params[:id])
+# o si el modelo tiene relación indirecta:
+@record = Model.joins(:parent).where(parents: { business_unit_id: @business_unit_id }).find(params[:id])
+```
+
+### Capa 5: Command Injection Prevention
+
+Los jobs que ejecutan comandos del sistema usan Array form (no string interpolation):
+
+```ruby
+# Inseguro:
+system("bin/rails task PARAM=#{user_input}")
+
+# Seguro:
+system({ 'PARAM' => safe_value }, 'bin/rails', 'task')
+
+# Para scripts Python (Open3):
+cmd = [PYTHON_BIN, safe_script_path] + validated_args
+Open3.capture3(*cmd)
+```
+
+### Capa 6: CSP — Content Security Policy
+
+Configurado en `ttpn-frontend/public/_headers` (Netlify):
+
+```text
+script-src 'self'                          # sin unsafe-inline ni unsafe-eval
+style-src 'self' 'unsafe-inline'           # Quasar requiere estilos dinámicos
+```
+
+`'unsafe-inline'` en scripts fue eliminado: Vue 3 + Vite pre-compila templates, no usa eval en producción.
+
+### Capa 7: Pre-commit Hook
+
+`.githooks/pre-commit` detecta antes de cada commit:
+
+- AWS keys (`AKIA...`)
+- Claves PEM privadas
+- Tokens Railway / Heroku
+- Valores reales en `SECRET_KEY_BASE`, `DEVISE_JWT_SECRET_KEY`, `N8N_ENCRYPTION_KEY`
+
+Activar en repo nuevo: `git config core.hooksPath .githooks`
+
+### Capa 8: Parameter Filtering
+
+`config/application.rb` filtra de logs:
+
+```ruby
+config.filter_parameters += [
+  :passw, :secret, :token, :_key, :crypt, :salt,
+  :authorization, :api_key, :jwt, :bearer,
+  :card_number, :cvv, :clabe, :webhook_secret
+]
+```
+
+### Capa 9: CVE Scanning — bundler-audit
+
+```bash
+bundle exec bundler-audit check   # en CI — detecta gems con CVEs conocidos
+```
+
+---
+
+## 12. Frontend — Quasar PWA
+
+### Patrón obligatorio de página
+
+Toda página nueva debe seguir el patrón:
+
+```text
+Page (orquestador)
+  ├── FilterPanel (composable useFilters)
+  ├── AppTable (componente estándar)
+  └── Dialog/Form (componente atómico)
+
+Composable (lógica de estado y API)
+  └── Service (llamada HTTP pura)
+```
+
+```vue
+<!-- VehiclesPage.vue — Page orquestador -->
+<script setup>
+import { useVehiclesOrchestrator } from 'composables/orchestrators/useVehiclesOrchestrator'
+
+const {
+  vehicles, loading, filters, pagination,
+  fetchVehicles, handleCreate, handleUpdate, handleDelete
+} = useVehiclesOrchestrator()
+</script>
+
+<template>
+  <q-page>
+    <FilterPanel :filters="filters" @apply="fetchVehicles" />
+    <AppTable :rows="vehicles" :loading="loading" :columns="columns" />
+  </q-page>
+</template>
+```
+
+**El composable** maneja estado, llama al service y expone funciones a la page.  
+**El service** es una función pura que solo hace el `api.get/post/patch/delete`.
+
+### Sistema de privilegios en FE
+
+```javascript
+// composables/usePrivileges.js
+const { canCreate, canEdit, canDelete } = usePrivileges('vehicles')
+
+// En template:
+<q-btn v-if="canCreate" @click="openDialog">Nuevo</q-btn>
+```
+
+Los privileges vienen del JWT, no de llamadas adicionales a la API.
+
+### Manejo de errores API
+
+**Siempre** usar `notifyApiError(error)`:
+
+```javascript
+import { useNotify } from 'composables/useNotify'
+const { notifyApiError } = useNotify()
+
+try {
+  await vehiclesService.create(form)
+} catch (error) {
+  notifyApiError(error)  // extrae error.response.data.errors automáticamente
 }
-
-# Uso en controladores
-def index
-  @vehicles = Rails.cache.fetch("vehicles/company/#{current_user.company_id}", expires_in: 30.minutes) do
-    Vehicle.where(company_id: current_user.company_id).to_a
-  end
-
-  render json: @vehicles
-end
-
-# Invalidación de cache
-after_save :clear_cache
-
-def clear_cache
-  Rails.cache.delete("vehicles/company/#{company_id}")
-end
 ```
 
+### Stores Pinia (solo auth y catálogos globales)
+
+Pinia se usa solo para estado verdaderamente global:
+
+| Store | Propósito |
+| --- | --- |
+| `auth-store.js` | Usuario activo, token JWT, login/logout |
+| `privileges-store.js` | Mapa de privileges del JWT |
+| `catalogs-store.js` | Catálogos globales cacheados (tipos de vehículo, etc.) |
+
+**No crear stores para estado de páginas** — eso va en composables.
+
+### CSP y PWA
+
+- `_headers`: CSP sin `unsafe-inline` en scripts (Netlify)
+- `_redirects`: SPA redirect (todas las rutas → `index.html`)
+- `quasar.config.js`: `globIgnores` incluye `_redirects` y `_headers` para que Workbox no los precachee
+
 ---
 
-## 🚀 Deployment
+## 13. Deployment — Railway + Supabase + Netlify
 
-### Railway (Backend)
+### Servicios en producción
 
-```yaml
-# railway.json
-{
-  "build": { "builder": "DOCKERFILE", "dockerfilePath": "Dockerfile" },
-  "deploy":
-    {
-      "numReplicas": 2,
-      "sleepApplication": false,
-      "restartPolicyType": "ON_FAILURE",
-      "restartPolicyMaxRetries": 10,
-    },
-}
+| Servicio | Rama | Propósito | Dominio |
+| --- | --- | --- | --- |
+| `kumi_admin_api` | `transform_to_api` | Rails API web | Sí (público) |
+| `kumi_sidekiq` | `transform_to_api` | Worker Sidekiq | No |
+| `Redis` | — | Cache + colas | No (interno) |
+| `N8N` | — | Automatización | Sí (protegido) |
+
+### Proceso de deploy BE
+
+```bash
+# 1. Push a GitHub (Railway escucha este remote)
+git push github transform_to_api
+
+# 2. Push a GitLab (mirror)
+git push origin transform_to_api
+
+# Railway hace auto-deploy y ejecuta db:prepare via Dockerfile
 ```
 
-### Netlify (Frontend)
+### Proceso de deploy FE
 
-```toml
-# netlify.toml
-[build]
-  command = "quasar build -m pwa"
-  publish = "dist/pwa"
+```bash
+# Netlify escucha GitLab (origin)
+git push origin main
 
-[[redirects]]
-  from = "/*"
-  to = "/index.html"
-  status = 200
-
-[build.environment]
-  NODE_VERSION = "20"
+# Netlify ejecuta automáticamente:
+quasar build -m pwa
+# Output: dist/pwa/
 ```
 
----
+### Variables de entorno clave
 
-## 🔒 Seguridad
+Ver `ttpngas/.env.example` para la lista completa. Las más críticas:
 
-### Mejores Prácticas
+```bash
+DATABASE_URL         → Supabase (Session mode, port 5432)
+REDIS_URL            → Redis interno de Railway (${{Redis.REDIS_URL}})
+DEVISE_JWT_SECRET_KEY → Firma de JWT (rotar cada 6 meses)
+SECRET_KEY_BASE      → Firma de sesiones Rails (rotar cada 6 meses)
+AWS_ACCESS_KEY_ID    → S3 (rotar cada 6 meses)
+FRONTEND_URL         → https://kumi.ttpn.com.mx (CORS whitelist)
+```
 
-1. **HTTPS Only** en producción
-2. **CORS** configurado correctamente
-3. **Rate Limiting** con Rack Attack
-4. **SQL Injection** prevenido con ActiveRecord
-5. **XSS** prevenido con sanitización
-6. **CSRF** tokens en formularios
-7. **Secrets** en variables de entorno
-8. **Brakeman** para análisis de seguridad
+### Verificación post-deploy
 
----
-
-## 📊 Performance
-
-### Optimizaciones
-
-1. **N+1 Queries:** Usar `includes` y `joins`
-2. **Paginación:** Kaminari para grandes datasets
-3. **Índices:** En columnas frecuentemente consultadas
-4. **Caching:** Redis para datos frecuentes
-5. **Background Jobs:** Para operaciones pesadas
-6. **CDN:** Para assets estáticos
+- [ ] `GET /up` retorna 200
+- [ ] Login en frontend funciona
+- [ ] Sidekiq procesando jobs (Railway Logs → kumi_sidekiq)
+- [ ] ActionCable conecta (WebSockets en consola del browser sin errores)
+- [ ] Upload de archivo a S3 funciona
 
 ---
 
-## 📈 Monitoreo
+## Referencias
 
-### Herramientas
-
-- **Scout APM:** Performance monitoring
-- **Sentry:** Error tracking
-- **Lograge:** Structured logging
-- **Sidekiq Web:** Job monitoring
-
----
-
-**Última actualización:** 2025-12-18  
-**Versión:** 1.0
+- [PRD.md](../PRD.md) — Qué hace cada módulo a nivel de negocio
+- [ADR/](ADR/) — Decisiones de arquitectura con contexto y alternativas
+- [SEGURIDAD.md](../seguridad/SEGURIDAD.md) — Capas de seguridad, RLS, CORS, checklist
+- [operaciones/railway_deployment.md](../operaciones/railway_deployment.md) — Guía detallada de deploy
+- [onboarding/onboarding_BE.md](../onboarding/onboarding_BE.md) — Setup local backend
+- [onboarding/onboarding_FE.md](../onboarding/onboarding_FE.md) — Setup local frontend

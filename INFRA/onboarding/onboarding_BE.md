@@ -121,7 +121,7 @@ Kumi TTPN Admin V2/            # Monorepo
 | Base de datos | PostgreSQL 15 |
 | Jobs background | Sidekiq 8 + Redis 7 |
 | Autenticación | Devise + JWT (devise-jwt) |
-| Autorización | CanCanCan + Privileges personalizados |
+| Autorización | Pundit + Privileges personalizados |
 | WebSockets | ActionCable |
 | API Docs | Rswag (Swagger/OpenAPI) — `/api-docs` |
 | Queue monitoring | Sidekiq Web UI — `/sidekiq` (solo admin) |
