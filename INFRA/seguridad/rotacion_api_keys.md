@@ -105,12 +105,12 @@ Después de rotar todo, verificar:
 ## Tareas únicas pendientes (no recurrentes)
 
 - [ ] **RLS**: Ejecutar `rls_policies.sql` en Supabase (dev y prod) — ver `INFRA/seguridad/rls_policies.sql`
-- [ ] **AWS credentials**: Rotar `AWS_ACCESS_KEY_ID` y `AWS_SECRET_ACCESS_KEY` en IAM — las credenciales anteriores fueron redactadas de los archivos de guía (2026-04-29)
+- [x] **AWS credentials**: Rotadas en IAM y Supabase (2026-04-29) — credenciales expuestas en historial de git por `RAILWAY_STAGING_DEPLOYMENT_GUIDE.md`
 
 ---
 
 ## Historial de rotaciones
 
-| Fecha | Responsable | Keys rotadas | Notas |
-|---|---|---|---|
-| — | — | — | Proceso creado 2026-04-29, primera rotación pendiente |
+| Fecha      | Responsable | Keys rotadas                   | Notas                                                          |
+|------------|-------------|--------------------------------|----------------------------------------------------------------|
+| 2026-04-29 | Antonio     | AWS IAM + Supabase DB password | Rotación de emergencia — credenciales expuestas en git history |
