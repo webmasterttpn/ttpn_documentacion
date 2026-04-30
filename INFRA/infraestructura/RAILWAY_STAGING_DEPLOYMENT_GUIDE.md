@@ -46,7 +46,7 @@ Esta guía detalla el proceso paso a paso para desplegar el backend **Kumi TTPN 
    RAILS_MASTER_KEY=PEGAR_AQUI_LA_LLAVE_MAESTRA
 
    # --- Supabase Database (Puerto Pooler 6543) ---
-   DATABASE_URL=postgres://postgres:KCcAxHw49Lrfzfot@db.cvuxaldvwgttpknmfjgo.supabase.co:6543/postgres
+   DATABASE_URL=[Supabase → Project Settings → Database → URI]
 
    # --- Frontend ---
    # Actualiza esto con la URL de tu Quasar en Railway o Vercel cuando la tengas.
