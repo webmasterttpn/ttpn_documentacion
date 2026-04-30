@@ -11,7 +11,7 @@ Este repositorio se entrega al cliente como `ttpn_documentacion` (repo privado i
 
 ```
 Documentacion/
-├── INFRA/           → Infraestructura, arquitectura, seguridad, onboarding, operaciones
+├── INFRA/           → Infraestructura, arquitectura, base de datos, seguridad, onboarding, operaciones
 ├── Backend/         → API Rails: dominio, servicios, testing, integraciones
 ├── Frontend/        → Vue/Quasar: componentes, patrones, páginas, integraciones
 ├── N8N/             → Automatización: setup, deploy, credenciales
@@ -30,6 +30,7 @@ Documentacion/
 | [seguridad/](INFRA/seguridad/) | RLS, CORS, security headers, checklist producción |
 | [onboarding/](INFRA/onboarding/) | Guía de desarrollador, setup BE/FE, nueva app |
 | [operaciones/](INFRA/operaciones/) | Runbook de incidentes |
+| [database/](INFRA/database/) | ERD global (rails-erd), convenciones de esquema, migraciones críticas |
 
 ---
 
@@ -68,7 +69,7 @@ Documentacion/
 | --- | --- |
 | [componentes/](Frontend/componentes/) | Componentes reutilizables: AppTable, modals, selector BU |
 | [patrones/](Frontend/patrones/) | Búsquedas, tabs anidados, sistema de privilegios |
-| [paginas/](Frontend/paginas/) | Refactors y notas por página específica |
+| [paginas/](Frontend/paginas/) | Páginas por dominio: bookings, dashboard, employees, vehicles, gas, settings, clientes, ruteo, finanzas, alertas |
 | [integraciones/](Frontend/integraciones/) | Importación Excel y otras integraciones |
 
 ---

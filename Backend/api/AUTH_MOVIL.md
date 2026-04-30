@@ -512,3 +512,12 @@ BE-5 → VehicleChecks con foto
 
 El chofer que hoy usa `Gasto_LOGIN.php` usaría exactamente el mismo flujo de ingreso —  
 mismos campos, mismo proceso de asignación de unidad — solo que ahora con un JWT seguro de vuelta.
+
+---
+
+## Ver también
+
+- [ADR-003 — JWTs Separados para Users y Employees](../../INFRA/arquitectura/ADR/ADR-003-jwt-separado-users-employees.md) — justificación de usar un JWT distinto para choferes vs usuarios admin
+- [SEGURIDAD.md](../../INFRA/seguridad/SEGURIDAD.md) — rate limiting con `Rack::Attack` en endpoints de login, Devise Lockable
+- [GUIA_DESARROLLADOR.md](../../INFRA/onboarding/GUIA_DESARROLLADOR.md) — patrón de autenticación y diferencia entre `BaseController` y `MobileBaseController`
+- [Modelo Employee](../dominio/employees/model.md) — campos `jti`, `imei` y método `elegible_para_operar?` en el modelo

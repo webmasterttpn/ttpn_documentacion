@@ -573,3 +573,11 @@ curl -I https://kumi-admin-api-production.up.railway.app | grep -i strict
 - Headers: [securityheaders.com](https://securityheaders.com)
 - CSP: [csp-evaluator.withgoogle.com](https://csp-evaluator.withgoogle.com)
 - SSL: [ssllabs.com/ssltest](https://www.ssllabs.com/ssltest/)
+
+---
+
+## Ver también
+
+- [ADR-008 — Hardening de Seguridad 2026](../arquitectura/ADR/ADR-008-hardening-seguridad-2026.md) — decisiones y alternativas consideradas para rate limiting, lockout, CSP e IDOR
+- [PRD.md](../PRD.md) — Sección 24: reglas de seguridad globales del sistema
+- [Backend/api/AUTH_MOVIL.md](../../Backend/api/AUTH_MOVIL.md) — rate limiting específico para el endpoint de login móvil (`Rack::Attack`)

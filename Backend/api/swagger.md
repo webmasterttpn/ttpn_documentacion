@@ -606,3 +606,11 @@ bundle exec rspec spec/requests/api/v1/vehicles_spec.rb
 **Última actualización:** 2025-12-18  
 **Versión:** 1.0  
 **Mantenido por:** TTPN Admin Team
+
+---
+
+## Ver también
+
+- [onboarding_BE.md](../../INFRA/onboarding/onboarding_BE.md) — checklist de merge: `bundle exec rake rswag:specs:swaggerize` es obligatorio antes de cada PR
+- [INFRAESTRUCTURA_API.md](INFRAESTRUCTURA_API.md) — arquitectura completa de la API: endpoints disponibles, autenticación y rate limiting
+- [GUIA_DESARROLLADOR.md](../../INFRA/onboarding/GUIA_DESARROLLADOR.md) — patrón de specs con rswag para documentar endpoints nuevos

@@ -102,3 +102,12 @@ app/mailers/alert_mailer.rb
 app/channels/alerts_channel.rb
 app/controllers/api/v1/alerts_controller.rb
 ```
+
+---
+
+## Ver también
+
+- [SEGURIDAD.md](../../../INFRA/seguridad/SEGURIDAD.md) — rate limiting, CSP y headers que protegen el canal de alertas
+- [ADR-007 — ActionCable sobre Polling](../../../INFRA/arquitectura/ADR/ADR-007-actioncable-sobre-polling.md) — justificación de usar WebSockets para alertas en tiempo real
+- [ADR-008 — Hardening de Seguridad 2026](../../../INFRA/arquitectura/ADR/ADR-008-hardening-seguridad-2026.md) — reglas de seguridad que aplican a los endpoints de alertas
+- [ARQUITECTURA_TECNICA.md](../../../INFRA/arquitectura/ARQUITECTURA_TECNICA.md) — Sección 7: flujo completo de ActionCable y autenticación WebSocket por BusinessUnit

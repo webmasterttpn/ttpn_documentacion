@@ -1,0 +1,8 @@
+# Notas históricas de sesiones sin estructura (45 archivos legacy)
+_archivo/session_notes/legacy/
+
+# Notas internas de planeación (no son documentación de referencia)
+_archivo/notas_internas/
+
+# Output de graphify
+graphify-out/

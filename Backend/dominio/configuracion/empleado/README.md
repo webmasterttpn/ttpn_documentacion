@@ -9,3 +9,11 @@ Pendiente de documentar. Ver [Configuración general](../README.md) para context
 ## Archivos Rails relacionados
 
 *(completar)*
+
+---
+
+## Ver también
+
+- [Dominio Finanzas](../../finanzas/README.md) — `KumiSetting` documenta las llaves de configuración de nómina (`payroll.periodo`, `payroll.dia_pago`, `payroll.hora_corte`)
+- [ARQUITECTURA_TECNICA.md](../../../../INFRA/arquitectura/ARQUITECTURA_TECNICA.md) — Sección 9: tabla `kumi_settings` y acceso via `KumiSetting.get(key, business_unit_id)`
+- [Configuración general](../README.md) — índice de todos los sub-dominios de configuración

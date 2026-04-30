@@ -61,3 +61,11 @@ app/controllers/api/v1/ttpn_services_controller.rb
 app/controllers/api/v1/ttpn_service_types_controller.rb
 app/controllers/api/v1/concessionaires_controller.rb
 ```
+
+---
+
+## Ver también
+
+- [Análisis TtpnBooking](../bookings/analisis/ANALISIS_TTPN_BOOKING.md) — cómo `TtpnService` y `TtpnServicePrice` se usan al crear y valorizar una reserva
+- [Dominio Bookings](../bookings/) — flujo completo del registro de viajes que consume este catálogo de servicios
+- [Dominio Clientes](../clientes/README.md) — `ClientTtpnService` vincula clientes con los servicios TTPN que tienen contratados

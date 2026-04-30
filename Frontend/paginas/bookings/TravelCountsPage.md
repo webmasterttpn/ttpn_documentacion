@@ -183,3 +183,11 @@ src/
 
 Reducción del orquestador: **1,381 → 130 líneas (−91%)**.
 Ningún archivo supera 200 líneas.
+
+---
+
+## Ver también
+
+- [TtpnBookingsCapturePage.md](TtpnBookingsCapturePage.md) — misma sesión de refactor, patrón idéntico
+- [README.md](README.md) — índice de todas las páginas del dominio bookings
+- [Backend/dominio/bookings/](../../../../Backend/dominio/bookings/) — TtpnBooking, TravelCount, flujo de cuadre

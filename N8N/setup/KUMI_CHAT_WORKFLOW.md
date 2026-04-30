@@ -711,3 +711,11 @@ Para cambiar el proveedor de IA hay que modificar en el JSON:
    - `"Bearer gsk_..."` → el nuevo API key
 
 **Todo lo demás — lógica, reglas, nodos, conexiones — queda igual.**
+
+---
+
+## Ver también
+
+- [Deuda Técnica: Kumi Chat](../../_archivo/deuda_tecnica/DEUDA_TECNICA_KUMI_CHAT.md) — estado actual del chat, endpoints pendientes de integrar y limitaciones conocidas
+- [INFRAESTRUCTURA_API.md](../../Backend/api/INFRAESTRUCTURA_API.md) — endpoints de la API de Kumi que consume este flujo: `vehicles`, `clients`, `ttpn_services`, `ttpn_bookings`
+- [N8N Railway Deploy Guide](../deploy/N8N_RAILWAY_DEPLOY.md) — cómo desplegar y actualizar este workflow en Railway

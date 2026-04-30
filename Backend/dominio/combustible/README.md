@@ -70,3 +70,11 @@ app/services/fuel_performance/performers_ranker.rb
 app/controllers/api/v1/gas_charges_controller.rb
 app/controllers/api/v1/fuel_performance_controller.rb
 ```
+
+---
+
+## Ver también
+
+- [Dominio Vehículos](../vehicles/) — `GasStation` es un modelo compartido entre combustible y vehículos; la flotilla consume combustible
+- [Dominio Proveedores](../proveedores/README.md) — `GasStation` puede actuar como proveedor en el contexto de compras
+- [ARQUITECTURA_TECNICA.md](../../../INFRA/arquitectura/ARQUITECTURA_TECNICA.md) — Sección 9: catálogo completo de modelos y a qué dominio pertenece cada uno

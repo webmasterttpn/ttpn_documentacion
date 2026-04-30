@@ -591,6 +591,17 @@ open http://localhost:3000/api-docs
 - **TablePlus** — cliente PostgreSQL/Supabase
 - **Bruno / Postman** — testing de API
 - **Swagger UI** — `/api-docs` en local
+- **Graphviz** — necesario para generar el ERD (`brew install graphviz`)
+
+### Generar el ERD global
+
+```bash
+cd ttpngas
+bundle exec erd
+# → genera Documentacion/INFRA/database/ERD.pdf
+```
+
+Regenerar siempre que agregues modelos o asociaciones nuevas. Ver [INFRA/database/README.md](../database/README.md).
 
 ---
 

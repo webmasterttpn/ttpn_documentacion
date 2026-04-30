@@ -900,3 +900,4 @@ FRONTEND_URL         → https://kumi.ttpn.com.mx (CORS whitelist)
 - [operaciones/railway_deployment.md](../operaciones/railway_deployment.md) — Guía detallada de deploy
 - [onboarding/onboarding_BE.md](../onboarding/onboarding_BE.md) — Setup local backend
 - [onboarding/onboarding_FE.md](../onboarding/onboarding_FE.md) — Setup local frontend
+- [Backend/dominio/vehicles/performance.md](../../Backend/dominio/vehicles/performance.md) — implementación detallada del patrón Serializer `minimal: true/false` con métricas de performance y código de referencia

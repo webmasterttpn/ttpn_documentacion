@@ -113,3 +113,12 @@ app/workers/payroll_process_worker.rb
 app/controllers/api/v1/payrolls_controller.rb
 app/controllers/api/v1/kumi_settings_controller.rb
 ```
+
+---
+
+## Ver también
+
+- [ARQUITECTURA_TECNICA.md](../../../INFRA/arquitectura/ARQUITECTURA_TECNICA.md) — Sección 6: queue `payrolls` de Sidekiq; Sección 9: llaves de `KumiSetting` con sus valores por defecto
+- [RUNBOOK_INCIDENTES.md](../../../INFRA/operaciones/RUNBOOK_INCIDENTES.md) — procedimiento de incidente si `PayrollProcessWorker` falla en producción
+- [Análisis TtpnBooking](../bookings/analisis/ANALISIS_TTPN_BOOKING.md) — `buscar_nomina()` conecta TravelCounts con la Payroll activa
+- [onboarding_BE.md](../../../INFRA/onboarding/onboarding_BE.md) — patrones de controller y service que aplican a este dominio

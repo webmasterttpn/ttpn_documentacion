@@ -31,9 +31,7 @@ Un `CrDay` puede tener múltiples horarios (`CrdHr`). Cada horario tiene una rut
 
 ## Estado del dominio
 
-Este dominio está implementado pero **no tiene motor de optimización de rutas**. La propuesta de motor de ruteo se encuentra en:
-
-`Documentacion/Backend/dominio/propuesta_motor_ruteo.md`
+Este dominio está implementado pero **no tiene motor de optimización de rutas**. La propuesta de motor de ruteo se encuentra en: [propuesta_motor_ruteo.md](../propuesta_motor_ruteo.md)
 
 La propuesta incluye integración con Google Maps / OSRM para optimización automática de paradas. Hoy las rutas se configuran manualmente.
 
@@ -68,3 +66,11 @@ app/models/review_point.rb
 app/controllers/api/v1/cr_days_controller.rb
 app/controllers/api/v1/review_points_controller.rb
 ```
+
+---
+
+## Ver también
+
+- [Propuesta Motor de Ruteo](../propuesta_motor_ruteo.md) — integración propuesta con Google Maps / OSRM para optimización automática de paradas
+- [Dominio Bookings](../bookings/) — los `CrdhRoute` y `CrdhrPoint` se usan al asignar rutas a reservas de viaje
+- [ARQUITECTURA_TECNICA.md](../../../INFRA/arquitectura/ARQUITECTURA_TECNICA.md) — Sección 9: modelos de ruteo (`CrDay`, `CrdHr`, `CrdhRoute`, `CrdhrPoint`) en la base de datos

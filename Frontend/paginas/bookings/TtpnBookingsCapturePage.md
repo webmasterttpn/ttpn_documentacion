@@ -135,7 +135,7 @@ src/
     FilterPanel.vue                       ← ya existía
     TtpnBookings/
       TtpnBookingForm.vue                 ← ya existía, sin cambios
-      TtpnBookingPassengerList.vue        ← ya existía, sin cambios
+      TtpnBookingPassengerList.vue        ← sin cambios
       Capture/                            ← NUEVA carpeta
         BookingCaptureFilters.vue
         BookingCaptureTable.vue
@@ -174,3 +174,12 @@ src/
 
 Reducción del orquestador: **1,277 → 213 líneas (−83%)**.
 Ningún archivo supera 215 líneas.
+
+---
+
+## Ver también
+
+- [TravelCountsPage.md](TravelCountsPage.md) — misma sesión de refactor, patrón idéntico
+- [README.md](README.md) — índice de todas las páginas del dominio bookings
+- [Backend/dominio/bookings/](../../../../Backend/dominio/bookings/) — TtpnBooking, TravelCount, flujo de cuadre
+- [Frontend/patrones/PATRON_TABS_NESTED_FORMS.md](../../patrones/PATRON_TABS_NESTED_FORMS.md) — patrón usado en TtpnBookingForm

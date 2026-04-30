@@ -248,3 +248,11 @@ end
 
 **Última actualización:** 2025-12-18  
 **Versión:** 2.0 (Optimizada)
+
+---
+
+## Ver también
+
+- [Modelo Vehicle](model.md) — campos completos del modelo, asociaciones y scopes
+- [ARQUITECTURA_TECNICA.md](../../../INFRA/arquitectura/ARQUITECTURA_TECNICA.md) — Sección 3: patrón obligatorio de controller con `VehicleSerializer.new(obj, minimal: true/false).as_json`
+- [GUIA_DESARROLLADOR.md](../../../INFRA/onboarding/GUIA_DESARROLLADOR.md) — patrón `Rails.cache.fetch` y concern `Cacheable` que se aplica en este controller
