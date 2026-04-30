@@ -190,38 +190,83 @@ ttpngas/
 
 Todos heredan de `Api::V1::BaseController < ActionController::API`.
 
+Los serializers son **clases Ruby puras** (no AMS). Cada serializer acepta una opción `minimal:`:
+
+- `minimal: true` → solo campos de lista (rápido, sin audit, sin associations costosas)
+- `minimal: false` (o sin opción) → respuesta completa con documentos y datos de auditoría
+
 ```ruby
-module Api
-  module V1
-    class VehiclesController < Api::V1::BaseController
-      before_action :set_vehicle, only: %i[show update destroy]
+class Api::V1::VehiclesController < Api::V1::BaseController
+  before_action :set_vehicle, only: %i[show update destroy]
 
-      def index
-        @vehicles = Vehicle.where(business_unit_id: @business_unit_id)
-                           .includes(:vehicle_type)
-                           .page(params[:page])
-        render json: @vehicles, each_serializer: VehicleSerializer
-      end
+  # GET /api/v1/vehicles
+  # La respuesta serializada se cachea por BU. Se invalida en cada mutación.
+  def index
+    cache_key = "vehicles/business_unit/#{Current.business_unit&.id}/serialized/v2"
 
-      def create
-        @vehicle = Vehicle.new(vehicle_params.merge(business_unit_id: @business_unit_id))
-        if @vehicle.save
-          render json: @vehicle, serializer: VehicleSerializer, status: :created
-        else
-          render json: { errors: @vehicle.errors }, status: :unprocessable_entity
-        end
-      end
-
-      private
-
-      def set_vehicle
-        @vehicle = Vehicle.where(business_unit_id: @business_unit_id).find(params[:id])
-      end
-
-      def vehicle_params
-        params.require(:vehicle).permit(:plates, :brand, :model, :year, :vehicle_type_id)
-      end
+    cached_response = Rails.cache.fetch(cache_key, expires_in: 1.hour) do
+      vehicles = Vehicle.business_unit_filter
+                        .includes(:vehicle_type, :concessionaires)
+                        .order(clv: :asc)
+      vehicles.map { |v| VehicleSerializer.new(v, minimal: true).as_json }
     end
+
+    render json: cached_response
+  end
+
+  # GET /api/v1/vehicles/:id
+  def show
+    render json: VehicleSerializer.new(@vehicle, minimal: false).as_json
+  end
+
+  # POST /api/v1/vehicles
+  def create
+    @vehicle = Vehicle.new(vehicle_params)
+    if @vehicle.save
+      invalidate_vehicles_cache
+      render json: VehicleSerializer.new(@vehicle).as_json, status: :created
+    else
+      render json: { errors: @vehicle.errors.full_messages }, status: :unprocessable_content
+    end
+  end
+
+  # PATCH/PUT /api/v1/vehicles/:id
+  def update
+    if @vehicle.update(vehicle_params)
+      invalidate_vehicles_cache
+      render json: VehicleSerializer.new(@vehicle).as_json
+    else
+      render json: { errors: @vehicle.errors.full_messages }, status: :unprocessable_content
+    end
+  end
+
+  # DELETE /api/v1/vehicles/:id
+  def destroy
+    @vehicle.destroy
+    invalidate_vehicles_cache
+    head :no_content
+  end
+
+  private
+
+  def set_vehicle
+    @vehicle = Vehicle.includes(:creator, :updater, vehicle_documents: { vehicle_doc_image_attachment: :blob })
+                      .friendly.find(params[:id])
+  rescue ActiveRecord::RecordNotFound
+    render json: { error: ERR_NOT_FOUND }, status: :not_found
+  end
+
+  def invalidate_vehicles_cache
+    Rails.cache.delete_matched('vehicles/business_unit/*/serialized/*')
+  end
+
+  def vehicle_params
+    params.require(:vehicle).permit(
+      :clv, :marca, :modelo, :annio, :serie, :placa, :status,
+      :vehicle_type_id, :password, :app_version,
+      concessionaire_ids: [],
+      vehicle_documents_attributes: [:id, :tipo_documento, :numero, :descripcion, :expiracion, :_destroy]
+    )
   end
 end
 ```
@@ -232,6 +277,7 @@ end
 - `params.permit!` está prohibido — siempre whitelist explícita
 - `find(params[:id])` siempre scoped a la BU del usuario (protección IDOR)
 - `before_action :authenticate_user!` en BaseController — no se repite en cada controller
+- Nunca `render json: @obj, serializer: AlgoSerializer` (sintaxis AMS) — usar siempre `AlgoSerializer.new(obj, opciones).as_json`
 
 ### Patrón de Service
 
@@ -266,7 +312,22 @@ end
 
 ### Auditoría automática
 
-Las tablas principales tienen `created_by_id` y `updated_by_id`. El `BaseController` los asigna automáticamente en cada create/update via concern. No es necesario pasarlos manualmente desde el controller.
+Las tablas principales tienen `created_by_id` y `updated_by_id`. El `BaseController` los asigna automáticamente en cada create/update via el concern `Auditable`. No es necesario pasarlos desde el controller.
+
+Los serializers exponen los datos de auditoría con nombres legibles (no solo IDs) a través del método `audit_data`:
+
+```ruby
+def audit_data
+  {
+    created_at: @vehicle.created_at,
+    created_by: @vehicle.creator&.nombre || @vehicle.creator&.email || 'Sistema',
+    updated_at: @vehicle.updated_at,
+    updated_by: @vehicle.updater&.nombre || @vehicle.updater&.email || 'Sistema'
+  }
+end
+```
+
+Este bloque solo aparece en la respuesta `full_json` (i.e. `minimal: false`), que se usa en `show`. Los listados (`minimal: true`) no lo incluyen por performance.
 
 ---
 
