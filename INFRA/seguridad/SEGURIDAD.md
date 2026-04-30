@@ -397,10 +397,10 @@ El SQL está listo en `Documentacion/INFRA/seguridad/rls_policies.sql`. **Aún n
 
 | Conexión | Usuario BD | `BYPASSRLS` | Afectado por RLS |
 | --- | --- | --- | --- |
-| Rails API (producción) | `service_role` | ✅ Sí | No — el ORM filtra por BU |
+| Rails API (producción) | `service_role` vía `DATABASE_URL` | ✅ Sí | No — el ORM filtra por BU |
+| Python scripts (`db.py`) | `service_role` vía `DATABASE_URL` (misma var que Rails) | ✅ Sí | No — acceso total igual que Rails |
 | Android / PHP (pruebas) | `postgres` vía pooler :6543 | ✅ Sí | No — superusuario |
 | N8N | N/A — llama Rails API vía HTTP + API Key | N/A | No aplica — Rails filtra por BU |
-| Python scripts (futuro) | `app_user` | ❌ No | Sí — necesita `SET LOCAL` |
 
 ### Transaction Pooler (puerto 6543) y SET LOCAL
 
@@ -576,7 +576,7 @@ curl -I https://kumi-admin-api-production.up.railway.app | grep -i strict
 ## 11. Pendientes
 
 - [ ] **RLS**: Ejecutar `rls_policies.sql` en Supabase (dev y prod)
-- [ ] **RLS**: Actualizar scripts Python (`utils/db.py`) para conectar como `app_user` y hacer `SET LOCAL` antes de queries
+- [ ] **Railway**: Eliminar variable `APP_USER_DATABASE_URL` del dashboard (fue creada por error — los scripts Python ya usan `DATABASE_URL`)
 - [ ] **CSP Frontend**: Revisar si `'unsafe-inline'` y `'unsafe-eval'` en `script-src` pueden eliminarse con Quasar build configurado para nonces o hashes
 - [ ] **FRONTEND_URL**: Verificar que Railway tiene `FRONTEND_URL=https://kumi.ttpn.com.mx` configurada
 - [ ] **ActionCable**: Verificar que `kumi.ttpn.com.mx` está en `allowed_request_origins` de `application.rb`
