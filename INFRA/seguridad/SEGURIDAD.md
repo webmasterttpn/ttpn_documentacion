@@ -583,5 +583,5 @@ curl -I https://kumi-admin-api-production.up.railway.app | grep -i strict
 - [x] **CSP Frontend**: `'unsafe-inline'` y `'unsafe-eval'` eliminados de `script-src` (2026-04-29) — `style-src` mantiene `'unsafe-inline'` por requerimiento de Quasar
 - [x] **FRONTEND_URL**: Confirmada en Railway — `FRONTEND_URL=https://kumi.ttpn.com.mx` (2026-04-29)
 - [x] **ActionCable**: `kumi.ttpn.com.mx` confirmado en `allowed_request_origins` de `application.rb` (2026-04-29)
-- [ ] **API Keys**: Establecer proceso formal de rotación semestral (recordatorio en calendario)
+- [x] **API Keys**: Proceso formal de rotación semestral documentado en `INFRA/seguridad/rotacion_api_keys.md` (2026-04-29)
 - [ ] **Webhooks AWS credentials**: Las credenciales AWS que aparecían en `RAILWAY_STAGING_DEPLOYMENT_GUIDE.md` y `railway_deployment.md` fueron redactadas (2026-04-29). Rotar en AWS IAM si aún no se ha hecho.
