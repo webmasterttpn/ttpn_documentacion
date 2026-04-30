@@ -1,6 +1,13 @@
-# 📘 Patrón de Tabs y Nested Forms Dinámicas
+# Patrón de Tabs y Nested Forms Dinámicas
 
-## 🎯 Basado en VehiclesPage.vue
+> **Cuándo usar inline vs composable para el estado del form:**
+>
+> - **Inline (`const form = ref({})` dentro del componente)** — correcto para dialogs y forms simples. El estado vive y muere con el dialog.
+> - **Composable** — usar cuando la lógica del form es compleja (validaciones cruzadas, transformaciones) o se comparte entre múltiples componentes.
+>
+> El patrón de esta guía usa estado inline, que es la opción correcta para dialogs CRUD estándar.
+
+## Basado en VehiclesPage.vue
 
 Este documento explica el patrón usado en Vehículos para implementarlo en Empleados.
 

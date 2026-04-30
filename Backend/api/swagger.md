@@ -22,7 +22,7 @@
 
    ```bash
    cd ttpngas
-   docker-compose up -d
+   rails server
    ```
 
 2. **Abrir Swagger UI en el navegador:**
@@ -38,7 +38,7 @@
 
 ### Producción
 
-**URL:** https://api.ttpn.com/api-docs
+**URL:** `https://kumi-admin-api-production.up.railway.app/api-docs`
 
 ---
 
@@ -173,7 +173,7 @@ Cada vez que agregues o modifiques un spec, debes regenerar la documentación:
 
 ```bash
 # Desde la raíz del proyecto
-docker-compose exec app rails rswag:specs:swaggerize
+bundle exec rake rswag:specs:swaggerize
 ```
 
 Esto:
@@ -277,7 +277,7 @@ end
 ### Paso 2: Regenerar Swagger
 
 ```bash
-docker-compose exec app rails rswag:specs:swaggerize
+bundle exec rake rswag:specs:swaggerize
 ```
 
 ### Paso 3: Verificar en Swagger UI
@@ -421,13 +421,12 @@ end
 
 ```bash
 # Verificar que el servidor esté corriendo
-docker-compose ps
+rails server
 
-# Reiniciar el servidor
-docker-compose restart app
-
-# Verificar logs
-docker-compose logs -f app
+# O con Docker:
+docker compose ps
+docker compose restart kumi_api
+docker compose logs -f kumi_api
 ```
 
 ### Problema: Token no funciona (401 Unauthorized)
@@ -456,7 +455,7 @@ curl -X POST http://localhost:3000/api/v1/auth/login \
 
 ```bash
 # Regenerar documentación
-docker-compose exec app rails rswag:specs:swaggerize
+bundle exec rake rswag:specs:swaggerize
 
 # Limpiar cache del navegador
 # Ctrl+Shift+R (Windows/Linux) o Cmd+Shift+R (Mac)
@@ -468,10 +467,10 @@ docker-compose exec app rails rswag:specs:swaggerize
 
 ```bash
 # Verificar que los specs sean válidos
-docker-compose exec app bundle exec rspec spec/requests/api/v1/vehicles_spec.rb
+bundle exec rspec spec/requests/api/v1/vehicles_spec.rb
 
 # Ver errores detallados
-docker-compose exec app rails rswag:specs:swaggerize --trace
+bundle exec rake rswag:specs:swaggerize --trace
 ```
 
 ---
@@ -558,10 +557,10 @@ tags 'Clientes'   # Todos los endpoints de clientes juntos
 
 ```bash
 # Generar documentación
-docker-compose exec app rails rswag:specs:swaggerize
+bundle exec rake rswag:specs:swaggerize
 
 # Ejecutar solo specs de Swagger
-docker-compose exec app bundle exec rspec spec/requests
+bundle exec rspec spec/requests
 
 # Ver Swagger UI
 open http://localhost:3000/api-docs
@@ -570,7 +569,7 @@ open http://localhost:3000/api-docs
 cat swagger/v1/swagger.yaml
 
 # Validar specs
-docker-compose exec app bundle exec rspec spec/requests/api/v1/vehicles_spec.rb
+bundle exec rspec spec/requests/api/v1/vehicles_spec.rb
 ```
 
 ---

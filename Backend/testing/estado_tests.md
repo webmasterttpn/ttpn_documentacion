@@ -1,6 +1,9 @@
-# 📊 Resumen de Tests - Sistema de Vehículos y API Keys
+# Resumen de Tests — Sistema de Vehículos y API Keys
 
-## ✅ Estado Actual de Tests
+> **Snapshot histórico — Diciembre 2025.** Los números de cobertura pueden haber cambiado.
+> Para el estado real ejecutar: `COVERAGE=true bundle exec rspec`
+
+## Estado de Tests (snapshot dic 2025)
 
 ### Tests Implementados
 
