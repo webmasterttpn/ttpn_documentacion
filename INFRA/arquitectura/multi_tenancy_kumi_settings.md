@@ -40,9 +40,10 @@ CREATE TABLE kumi_settings (
 **BusinessUnit 1 (TTPN):**
 
 ```ruby
-KumiSetting.payroll_dia_pago(1)     # => 4 (Jueves)
-KumiSetting.payroll_periodo(1)      # => "semanal"
-KumiSetting.payroll_hora_corte(1)   # => "01:30"
+KumiSetting.payroll_dia_pago(1)            # => 4 (Jueves)
+KumiSetting.payroll_periodo(1)             # => "semanal"
+KumiSetting.payroll_hora_corte(1)          # => "01:30"
+KumiSetting.payroll_tiempo_tolerancia(1)   # => 6 (horas para capturar un viaje)
 ```
 
 **BusinessUnit 2 (Otra empresa):**
@@ -119,6 +120,7 @@ KumiSetting.set_value(business_unit_id, key, value, description:, category:)
 KumiSetting.payroll_dia_pago(business_unit_id)
 KumiSetting.payroll_periodo(business_unit_id)
 KumiSetting.payroll_hora_corte(business_unit_id)
+KumiSetting.payroll_tiempo_tolerancia(business_unit_id)  # horas para capturar un viaje (default 6)
 
 # Inicializar defaults
 KumiSetting.initialize_defaults(business_unit_id)
