@@ -192,6 +192,54 @@ costo por litro = $4,000 / 200 = $20
 Resultado: el Aceite queda con **200 litros** disponibles y **costo promedio
 $20 por litro**.
 
+### 4.2.1 Varias presentaciones del mismo líquido (caso real)
+
+Es común recibir el mismo aceite en formatos distintos: a veces en **galones
+empacados en caja**, a veces en **litros sueltos por caja**. Cada combinación
+real es **una Presentación distinta** en el catálogo, y su `Unidades base` es
+**el total de unidad base que trae la caja completa**. Como `Unidades base`
+acepta decimales, los envases fraccionarios (4.9 L, 0.946 L, etc.) funcionan
+sin problema.
+
+**Ejemplo**: Aceite Motor 5W-30 (unidad base = *litro*) recibido en dos formas:
+
+| Presentación a crear | Unidades base | Cálculo |
+| --- | --- | --- |
+| Caja 6 galones 4.9 L | 29.4 | 6 envases × 4.9 L |
+| Caja 24 litros | 24 | 24 envases × 1 L |
+
+> Cree una presentación por cada formato real. El catálogo de presentaciones
+> es libre y por unidad de negocio; no se mezclan entre productos.
+
+**Captura de cada recepción:**
+
+| Recepción | Presentación | Cant. | Costo unit. (la caja) | El sistema suma |
+| --- | --- | --- | --- | --- |
+| A | Caja 6 galones 4.9 L | 1 | $1,470 | 29.4 L a $50/L |
+| B | Caja 24 litros | 1 | $1,320 | 24 L a $55/L |
+
+> Recuerde: `Cant.` es **cuántas cajas** recibe, no litros. El `Costo unit.` es
+> el costo **de una caja**. La conversión a litros y a costo por litro la hace
+> el sistema usando *Unidades base* de la presentación.
+
+**Costo promedio resultante** (móvil ponderado por unidad base):
+
+```
+costo por litro de A = $1,470 / 29.4 = $50.00
+costo por litro de B = $1,320 / 24   = $55.00
+
+promedio combinado  = (29.4·$50 + 24·$55) / (29.4 + 24)
+                    = (1,470 + 1,320) / 53.4
+                    = $52.25 por litro
+```
+
+Al consumir, el costo cargado es el promedio vigente (sección 6), sin importar
+de qué caja salió el aceite.
+
+> 💡 **Cuándo crear más presentaciones**: si a veces compra **galones sueltos**
+> (sin caja) o **litros sueltos**, cree también `Galón 4.9 L` (base 4.9) y
+> `Litro` (base 1). Cada forma de comprar = una presentación.
+
 ### 4.3 Regla de oro
 
 > **Usted siempre captura en PRESENTACIONES (cajas, tambores, piezas) y a costo
