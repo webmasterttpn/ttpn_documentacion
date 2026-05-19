@@ -11,6 +11,136 @@ Actualizar el `Status` y el bloque `Avance` en lugar de crear archivos nuevos.
 
 ---
 
+### DT-011 — MTTO: total/subtotal/IVA de Recepciones no se autocalcula
+**Registrada:** 2026-05-19 | **Dominio:** Backend — mantenimiento | **Severidad:** Media
+**Status:** Pendiente
+
+`Mtto::ProductReceipt` tiene columnas `subtotal`, `tax_amount`, `total_amount` pero quedan en
+0.0 incluso después de procesar la recepción. `line_total` sí se calcula bien por línea
+(columna generada `quantity_received * unit_cost`). En el manual la tabla de Recepciones se ve
+con "Total: 0.0" en todos los renglones.
+
+**Solución propuesta:** En `Mtto::ReceiveProductService` (o un callback de
+`product_receipt_items`), sumar `line_total` de las líneas aceptadas al cerrar la recepción y
+asignarlo a `subtotal` (y `total_amount` mientras no haya cálculo de IVA). Si más adelante se
+captura IVA, agregar la fórmula explícita. Actualizar el serializer del controller y la
+columna "Total" del FE.
+
+---
+
+### DT-012 — MTTO: Fase 2 — Órdenes de Compra (Purchase Orders)
+**Registrada:** 2026-05-19 | **Dominio:** Backend + Frontend — mantenimiento | **Severidad:** Media
+**Status:** Pendiente
+
+El SQL original incluía `mtto_purchase_orders` + `mtto_purchase_order_items`. En Fase 1 se
+omitió: hoy las Recepciones se crean libres (sin OC). Falta flujo formal de OC con
+seguimiento (cantidades ordenadas vs recibidas vs facturadas, estado por línea, lead time
+medido por OC).
+
+**Solución propuesta:** Crear tablas `mtto_purchase_orders` + items, modelos `Mtto::PurchaseOrder`
+y `Mtto::PurchaseOrderItem`, controllers + service de cierre. Vincular opcionalmente
+`mtto_product_receipts.purchase_order_id` (ya estaba reservado en el SQL original). UI: catálogo
+con folio `PO-YYYY-NNN`, líneas con `supplier_product` para autollenar precio/lead time.
+
+---
+
+### DT-013 — MTTO: Fase 2 — PWA de mecánicos + sugerencias de servicios en OT
+**Registrada:** 2026-05-19 | **Dominio:** Backend + nuevo FE (PWA) — mantenimiento | **Severidad:** Media
+**Status:** Pendiente
+
+En Fase 1 la OT la activa el administrador y los mecánicos no tienen acceso directo. Quedó
+pendiente la PWA dedicada para mecánicos donde puedan activar la OT, iniciar/pausar/completar,
+y **sugerir servicios adicionales** si al inspeccionar el vehículo detectan algo extra (ej.
+durante "cambio de aceite" se ve que necesita "cambio de balatas").
+
+**Solución propuesta:** Cambio aditivo en `mtto_work_order_services` (no requiere migración
+destructiva): columnas `is_suggested:boolean`, `suggestion_status:string`
+(`pending|approved|rejected`), `suggested_by_id:bigint`, `approved_by_id:bigint`. Endpoints
+`POST /work_order_services/:id/approve` y `/reject` para el administrador. PWA con login,
+listado de OT asignadas al mecánico y vista de servicios + botón "sugerir nuevo".
+
+---
+
+### DT-014 — MTTO: Fase 2 — Conteos cíclicos de inventario
+**Registrada:** 2026-05-19 | **Dominio:** Backend + Frontend — mantenimiento | **Severidad:** Media
+**Status:** Pendiente
+
+El SQL original incluía `mtto_inventory_counts` + `mtto_inventory_count_items` para auditorías
+periódicas (cantidad teórica vs real, varianza). No se implementó en Fase 1.
+
+**Solución propuesta:** Crear tablas + modelos `Mtto::InventoryCount` / `CountItem`, flujo de
+captura por almacén con `expected_quantity` (snapshot del sistema) vs `actual_quantity` (lo
+que se cuenta físico), `variance` virtual generada, status (`in_progress`/`discrepancy_review`/
+`completed`). Al completar, generar `inventory_movement` tipo `adjustment` por cada varianza
+distinta de 0 para mantener el libro auditable consistente.
+
+---
+
+### DT-015 — MTTO: Fase 2 — Historial de costos + analíticas JIT/spending
+**Registrada:** 2026-05-19 | **Dominio:** Backend — mantenimiento | **Severidad:** Baja
+**Status:** Pendiente
+
+El SQL original incluía `mtto_product_cost_history` y vistas analíticas
+(`v_supplier_spending_analysis`, `v_jit_performance`). Diferidas a Fase 2; el costo promedio
+móvil actual cubre la operación pero no las tendencias.
+
+**Solución propuesta:**
+
+1. `mtto_product_cost_history` poblada por `ReceiveProductService` con `(product, supplier,
+   unit_cost_base, cost_date)` para gráficas de tendencia de precio por proveedor.
+2. Endpoints/dashboards de análisis: gasto por proveedor (suma `quantity_consumed_average ·
+   unit_cost_charged` por proveedor de origen), lead time real vs `lead_time_days` (cuando
+   exista OC — ver DT-012), OT vencidas vs en tiempo.
+
+---
+
+### DT-016 — MTTO: alerta de stock bajo no implementada
+**Registrada:** 2026-05-19 | **Dominio:** Backend — mantenimiento | **Severidad:** Baja
+**Status:** Pendiente
+
+`Mtto::Product.low_stock` ya existe como scope y el FE muestra estado `REORDER`/`OUT_OF_STOCK`
+en la tabla, pero no hay job que recorra los productos bajo mínimo y dispare una `Alert` en el
+dominio `alertas` existente.
+
+**Solución propuesta:** Job en cola `:alerts` (Sidekiq, cron diario) que itere
+`Mtto::Product.business_unit_filter.active.low_stock` y, por cada producto, cree una `Alert`
+con `AlertRule` tipo "stock_bajo_mantenimiento". Es cron silencioso → sin ActionCable (tabla
+de decisión de `ttpngas/CLAUDE.md`).
+
+---
+
+### DT-017 — MTTO: vistas de detalle (Ver) en Recepciones/Salidas/OT del FE
+**Registrada:** 2026-05-19 | **Dominio:** Frontend — mantenimiento | **Severidad:** Baja
+**Status:** Pendiente
+
+Las páginas de Recepciones, Salidas y Órdenes de Trabajo solo exponen tabla y formulario de
+creación/edición. No hay diálogo de "Ver detalle" como sí existe en `src/pages/Suppliers/`
+(`SupplierDetails.vue`). El operador no puede revisar las líneas/servicios de un registro sin
+entrar al modo edición.
+
+**Solución propuesta:** Crear `ReceiptDetails.vue`, `TransferDetails.vue` y
+`WorkOrderDetails.vue` con el detalle (líneas/servicios + audit trail + movimientos
+relacionados de inventario). Agregar botón "Ver" (icono `visibility`) en las tablas + mobile
+list, abriendo el diálogo correspondiente.
+
+---
+
+### DT-018 — MTTO: tablero de monitoreo sin desglose de servicios por OT
+**Registrada:** 2026-05-19 | **Dominio:** Frontend — mantenimiento | **Severidad:** Baja
+**Status:** Pendiente
+
+Las cards del Tablero (`WorkOrdersMonitorPage.vue`) muestran folio, mecánico, estimado vs
+transcurrido y bandera de retraso, pero **no listan los servicios** que incluye la OT. El
+supervisor no ve de un vistazo qué trabajos tiene cada mecánico.
+
+**Solución propuesta:** El payload del broadcast `MttoWorkOrdersChannel` ya puede llevar la
+lista de servicios (vienen en `serialize(:detailed)` del controller). Incluir un campo
+`services_summary` (ej. `"Cambio de aceite · Cambio de balatas"` o `"Cambio aceite (45'),
+Balatas (60')"`) en el broadcast del modelo y en el endpoint `?active=true`, y renderizar como
+chips en la card.
+
+---
+
 ### DT-009 — `ClientContact` modelo sin tabla en BD
 **Registrada:** 2026-04-30 | **Dominio:** Backend — clientes | **Severidad:** Baja
 **Status:** Pendiente
