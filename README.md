@@ -58,6 +58,7 @@ Documentacion/
 | `finanzas/` | Payroll, EmployeeSalary, Invoicing |
 | `ruteo/` | CrDay, CrdHr, CrdhRoute, paradas |
 | `alertas/` | Alert, AlertRule, AlertDelivery |
+| `mantenimiento/` | Mtto::Product, Mtto::Inventory, Mtto::WorkOrder (Control de Inventario de Taller) |
 | `configuracion/` | KumiSetting, Role, Privilege |
 | `auth/` | User, BusinessUnit |
 
