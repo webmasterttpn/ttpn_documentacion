@@ -20,12 +20,18 @@ CREATE TABLE mtto_categories (
     UNIQUE (name, business_unit_id), UNIQUE (code, business_unit_id)
 );
 
--- 2. PRESENTACIONES (catálogo seleccionable)
+-- 2. PRESENTACIONES (catálogo seleccionable, modelo de DOS niveles)
+--    unit_size_base : tamaño del envase en unidad base (ej. 4.9 para un galón de 4.9 L)
+--    units_per_pack : envases por paquete (ej. 6 para caja x6 galones, 1 para envase suelto)
+--    base_quantity  : DERIVADO = unit_size_base * units_per_pack
+--                     (lo recalcula el before_validation de Mtto::PackSize)
 CREATE TABLE mtto_pack_sizes (
     id BIGSERIAL PRIMARY KEY,
-    name VARCHAR(100) NOT NULL,           -- "Tambor 200 L", "Caja x12"
+    name VARCHAR(100) NOT NULL,                   -- "Caja 6 galones 4.9 L", "Tambor 200 L"
     clv VARCHAR(20),
-    base_quantity NUMERIC(14,4) NOT NULL, -- unidades base por presentación
+    unit_size_base NUMERIC(14,4) NOT NULL DEFAULT 1,
+    units_per_pack INTEGER NOT NULL DEFAULT 1,
+    base_quantity  NUMERIC(14,4) NOT NULL,        -- derivado: unit_size_base * units_per_pack
     description TEXT,
     is_active BOOLEAN DEFAULT true,
     business_unit_id BIGINT REFERENCES business_units(id),
