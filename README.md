@@ -14,6 +14,7 @@ Documentacion/
 ├── INFRA/           → Infraestructura, arquitectura, base de datos, seguridad, onboarding, operaciones
 ├── Backend/         → API Rails: dominio, servicios, testing, integraciones
 ├── Frontend/        → Vue/Quasar: componentes, patrones, páginas, integraciones
+├── Manuales/        → Manuales de usuario final (con capturas)
 ├── N8N/             → Automatización: setup, deploy, credenciales
 └── _archivo/        → Notas internas (NO incluir en entrega al cliente)
 ```
@@ -72,6 +73,14 @@ Documentacion/
 | [patrones/](Frontend/patrones/) | Búsquedas, tabs anidados, sistema de privilegios |
 | [paginas/](Frontend/paginas/) | Páginas por dominio: bookings, dashboard, employees, vehicles, gas, settings, clientes, ruteo, finanzas, alertas |
 | [integraciones/](Frontend/integraciones/) | Importación Excel y otras integraciones |
+
+---
+
+## Manuales de usuario
+
+| Documento | Descripción |
+| --- | --- |
+| [mantenimiento/manual_usuario.md](Manuales/mantenimiento/manual_usuario.md) | Manual del módulo de Mantenimiento (Control de Inventario de Taller) con capturas — incluye recepción **pieza vs. líquido** y costo hundido |
 
 ---
 
