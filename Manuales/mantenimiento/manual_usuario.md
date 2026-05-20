@@ -203,6 +203,10 @@ a unidad base.
 
 > Sólo al **Procesar** se afecta el inventario y se recalcula el costo
 > promedio. Mientras está `in_progress` aún puede corregirla.
+>
+> La columna **Total** del listado es el **monto facturado por el proveedor**:
+> Σ (Cant. × Costo unit.) de todas las líneas — es decir, **lo recibido**,
+> no lo aceptado. Se actualiza solo al guardar la recepción.
 
 ### 6.1 Caso A — Producto por **PIEZA** (Filtro de Aire)
 

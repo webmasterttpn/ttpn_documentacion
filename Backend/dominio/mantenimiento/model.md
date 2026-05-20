@@ -57,6 +57,13 @@ Libro auditable **append-only** (`before_update`/`before_destroy` →
 Recepción de producto. Folio `REC-YYYY-NNN` (`NumberSequenceService`). Las líneas
 se capturan en presentaciones; `ReceiveProductService` convierte a unidad base.
 
+`subtotal` y `total_amount` se recalculan automáticamente con un `after_commit
+:recalc_totals` que suma la columna virtual `line_total` (`quantity_received *
+unit_cost`) de las líneas. Representan el monto **facturado** por el proveedor
+(lo recibido), no lo aceptado tras revisión — para conciliar lo aceptado se usa
+`quantity_accepted` por línea. El callback no genera loop porque persiste con
+`update_columns` (sin callbacks).
+
 ## Mtto::WorkOrder / WorkOrderService
 
 Orden de Trabajo. `enum status` (draft/activated/in_progress/paused/completed/
