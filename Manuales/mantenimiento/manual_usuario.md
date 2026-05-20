@@ -366,13 +366,18 @@ Pasos: **Nueva Salida** → elija el **Tipo** → destino u OT → agregue
 **productos** con la cantidad (en unidad base) → en líquidos puede capturar
 **Residuo devuelto** → **Guardar** → **Procesar**.
 
-> **⚠️ Regla de oro de la captura.** Tanto **Cantidad** como **Residuo
-> devuelto** se capturan en la **unidad base del producto** (la que aparece
-> en el catálogo de Productos): *litros* para líquidos, *piezas* para
-> sólidos. Cuando seleccionas un producto, la aplicación muestra la unidad
-> al lado del input (ej. `Cantidad (litro)`) y la cantidad disponible. Para
-> devolver **1.5 L** escribes `1.5`, **no** `1500`. Para sacar **4.9 L**
-> escribes `4.9`, **no** `4900`.
+> **⚠️ Regla de oro de la captura.** Para líquidos, junto a cada campo
+> (Cantidad y Residuo) hay un toggle **L / ml**. Captura el número como lo
+> ves en el envase y elige la unidad que corresponda; el sistema convierte
+> solo a la unidad base interna (litros).
+>
+> Ejemplo real: entregas **1 L de aceite** y te regresan **355 ml** de
+> residuo. Captura `1` en Cantidad con **L** seleccionado, y `355` en
+> Residuo con **ml** seleccionado. El hint debajo de Residuo te confirma
+> `= 0.355 litro`.
+>
+> Para sólidos (filtros, repuestos) la unidad es siempre **pieza** y no
+> aparece toggle.
 
 ### 9.1 Residuo reutilizable de líquidos (costo hundido)
 
