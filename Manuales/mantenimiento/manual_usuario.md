@@ -366,6 +366,14 @@ Pasos: **Nueva Salida** → elija el **Tipo** → destino u OT → agregue
 **productos** con la cantidad (en unidad base) → en líquidos puede capturar
 **Residuo devuelto** → **Guardar** → **Procesar**.
 
+> **⚠️ Regla de oro de la captura.** Tanto **Cantidad** como **Residuo
+> devuelto** se capturan en la **unidad base del producto** (la que aparece
+> en el catálogo de Productos): *litros* para líquidos, *piezas* para
+> sólidos. Cuando seleccionas un producto, la aplicación muestra la unidad
+> al lado del input (ej. `Cantidad (litro)`) y la cantidad disponible. Para
+> devolver **1.5 L** escribes `1.5`, **no** `1500`. Para sacar **4.9 L**
+> escribes `4.9`, **no** `4900`.
+
 ### 9.1 Residuo reutilizable de líquidos (costo hundido)
 
 Cuando entrega líquido a una OT y sobra una parte aún utilizable, captúrela
