@@ -188,7 +188,13 @@ a unidad base.
 ### Pasos generales
 
 1. **Mantenimiento → Recepciones → Nueva Recepción**.
-2. Seleccione el **Proveedor**, capture **Factura** y **Ubicación de almacén**.
+2. Seleccione el **Proveedor** y capture:
+   - **Factura del proveedor** — folio de la remisión / nota de entrega
+     que entrega el proveedor con la mercancía.
+   - **Factura fiscal** — folio del CFDI / factura SAT. Es opcional al
+     momento de la recepción porque el proveedor a veces la emite después;
+     puede dejarlo en blanco y editarlo cuando llegue.
+   - **Ubicación de almacén**.
 3. Por cada producto, **Agregar línea**:
    - **Producto**
    - **Presentación** ← *aquí está la diferencia pieza vs. líquido*
