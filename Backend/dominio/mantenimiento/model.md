@@ -64,6 +64,19 @@ unit_cost`) de las líneas. Representan el monto **facturado** por el proveedor
 `quantity_accepted` por línea. El callback no genera loop porque persiste con
 `update_columns` (sin callbacks).
 
+**Validaciones financieras (importante):**
+
+- `pack_size_id` es obligatorio (NOT NULL en BD y `belongs_to` sin
+  `optional: true`). Sin él el factor presentación→unidad base es indefinido
+  y `ReceiveProductService` contaminaría el costo promedio del producto.
+- `quantity_received` y `unit_cost` deben ser **estrictamente positivos**
+  (`> 0`). Un costo unitario de 0 reduciría artificialmente el `average_cost`
+  del producto.
+- `quantity_accepted >= 0` y `quantity_accepted + quantity_rejected <=
+  quantity_received`.
+- `subtotal`, `total_amount` y `status` **no** se aceptan en `permit` del
+  controller; los gestiona el modelo (totales) y el service (status).
+
 ## Mtto::WorkOrder / WorkOrderService
 
 Orden de Trabajo. `enum status` (draft/activated/in_progress/paused/completed/
@@ -72,12 +85,68 @@ cancelled). `belongs_to :mechanic, class_name: 'Employee'` (un mecánico por OT)
 broadcast `mtto_work_orders_#{bu}`. `WorkOrderService` copia el tiempo estándar
 del catálogo al crearse y recalcula el estimado de la OT.
 
+`has_many :inventory_transfers` con `dependent: :restrict_with_error` — una
+OT con salidas registradas no se puede destruir sin reversar antes el
+material consumido (evita pérdida de trazabilidad contable).
+
+`materials_cost` suma `line_cost` de las transfers `completed` ligadas a la
+OT. Es el número que finanzas usa para conocer el costo real de la OT y se
+expone en el serializer del controller.
+
+`WorkOrderProgressService#call(:cancel)` **bloquea** la cancelación si hay
+transfers completadas — exige que el operador reverse el consumo antes de
+poder cancelar. Sin este check, el inventario quedaba descontado contra una
+OT cancelada.
+
 ## Mtto::InventoryTransfer / InventoryTransferItem
 
 Salida. `transfer_type` ∈ {`departmental`, `work_order`} (requiere
 `work_order_id` si es `work_order`). Folio `OUT-YYYY-NNN`. Las líneas registran
 `quantity_consumed_recovered`, `quantity_consumed_average`,
 `quantity_residue_returned`, `unit_cost_charged`, `line_cost`.
+
+**Estados**: `enum :status` con valores
+`draft|pending_approval|approved|completed|cancelled`. Una salida es
+`cancelable?` solo desde los tres primeros — `completed` requiere reverso
+manual explícito (no se permite `DELETE` desde el controller).
+
+**`status` no se acepta en `permit`** del controller. Las transiciones a
+`completed` van solo vía `POST /complete` (que ejecuta el service con
+descuento real); a `cancelled` solo vía `DELETE` (que valida `cancelable?`).
+Esto evita saltarse la descarga de inventario marcando `status` directo.
+
+**`unit_cost_charged` vs `effective_unit_cost`**: `unit_cost_charged` =
+`average_cost` del inventario al momento del consumo (referencia histórica
+del precio promedio). Cuando una línea consume capas mezcladas
+(recovered + average), `unit_cost_charged` no refleja el precio unitario
+efectivo de la línea; para ese caso usar `effective_unit_cost = line_cost /
+quantity_transferred` (método del modelo, también expuesto en el serializer).
+
+**Validación residue ≤ consumido**: `quantity_residue_returned` no puede
+exceder `quantity_approved` (o `quantity_requested` si no hay aprobado).
+Sin este tope, el bucket `quantity_recovered` podía inflarse y crear
+inventario gratis.
+
+## Concurrencia y append-only
+
+`ReceiveProductService` y `TransferProductService` ahora usan `lock!`
+pesimista sobre la recepción/salida y sobre el `Inventory` antes de mutar
+cantidades. Dos clicks simultáneos de "Procesar" se serializan; el segundo
+lee `status='completed'` tras el lock y aborta con `AlreadyProcessed` —
+evita duplicación de movimientos e inventario.
+
+`mtto_inventory_movements` es **append-only** con dos defensas:
+
+1. Callbacks Ruby `before_update`/`before_destroy` en el modelo (Rails-side).
+2. Triggers PL/pgSQL `BEFORE UPDATE`/`BEFORE DELETE` en BD
+   (`mtto_inventory_movements_append_only` — instalado por la migration
+   `HardenMttoFinancialIntegrity`) — defensa también contra
+   `update_columns` y `delete` que saltan callbacks.
+
+Un índice único sobre `(source_type, source_id, product_id, cost_layer)`
+(filtrado a `receipt`/`transfer`) sirve como cinturón de seguridad ante un
+race que se le escape al lock: un segundo INSERT con la misma combinación
+falla con `RecordNotUnique` y aborta la transacción.
 
 ## Modelos existentes modificados
 
