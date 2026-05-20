@@ -12,14 +12,40 @@ ROI / break-even / burn rate de cada uno por separado sin duplicar tablas.
 - `starts_at`, `is_active`.
 - `auto_revenue_source` ∈ `{'none', 'mtto_work_orders'}` — si es
   `mtto_work_orders` el Dashboard suma como revenue el `materials_cost` de
-  las OTs `completed` de la BU. Útil para proyectos que aún no facturan
-  externos (taller interno) pero quieren medir el "ahorro" generado contra
-  inversión.
+  las OTs `completed` de la BU. **⚠️ Esta opción está deprecated** porque
+  `materials_cost` no es ingreso — es el costo del material ya pagado. Se
+  conserva el valor en el enum por compatibilidad, pero no se debe usar en
+  proyectos nuevos. Próximamente se agregará `'mtto_internal_savings'` que
+  sí calcula ahorro real (precio de venta de productos + tarifa externa de
+  servicios − costo real de OT).
 - `has_many :concepts, :entries, dependent: :restrict_with_error` — no se
   destruye un proyecto con movimientos (sería pérdida silenciosa de datos).
 
 Seed inicial (migration `20260520215508`): proyecto **Taller Mecánico TTPN**
-con `auto_revenue_source: 'mtto_work_orders'`.
+con `auto_revenue_source: 'none'` (burn rate honesto hasta que existan
+los datos para calcular ahorro real).
+
+### Datos para calcular ahorro estimado
+
+Estos campos viven en Mantenimiento pero alimentan el ahorro estimado del
+proyecto:
+
+- `mtto_products.sale_price` (decimal opcional) — precio unitario en unidad
+  base del producto cuando se aplica en una OT interna. Migración
+  `20260520231215_add_sale_price_and_external_rate_to_mtto`.
+- `mtto_services.external_rate` (decimal opcional) — lo que cobraría un
+  taller externo por ese servicio completo (mano de obra incluida).
+
+Cuando ambos estén poblados, el cálculo de ahorro por OT será:
+
+```text
+ahorro_OT = Σ(consumo × producto.sale_price)
+          + Σ(servicios.external_rate)
+          − OT.materials_cost
+```
+
+El proyecto que tenga `auto_revenue_source: 'mtto_internal_savings'`
+sumará ese ahorro como revenue mensual en el dashboard.
 
 ### `Finance::Concept` (`finance_concepts`)
 

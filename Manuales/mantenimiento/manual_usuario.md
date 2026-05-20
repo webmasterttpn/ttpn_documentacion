@@ -132,6 +132,12 @@ Nuevo Producto**. Los campos clave:
   kilogramo, caja, …) o puede escribir una nueva. **Esta es la unidad en la que
   vivirá el inventario y se consumirá.**
 - **Mín./Máx./Reorden/Lead time** — umbrales para alertas de stock.
+- **Precio de venta (por unidad base)** — *opcional, pero clave para medir
+  ahorro*. Es lo que costaría 1 unidad base (1 litro, 1 pieza) si lo comprara
+  en taller externo o se lo facturara a un tercero. Cuando el inventario se
+  consuma en una OT, este precio se usa para calcular cuánto se "ahorró" TTPN
+  al usar inventario propio en lugar de cotizar afuera. Si aún no lo tiene,
+  déjelo en blanco — se puede agregar después editando el producto.
 
 ### 5.1 Capturar un producto **por pieza** (ejemplo: Filtro de Aire)
 
@@ -316,6 +322,12 @@ Ejemplos típicos: *Cambio de aceite* (45 min, Preventivo); *Cambio de balatas*
 (60 min, Correctivo). Estos tiempos son los que se usan como referencia en el
 tablero de monitoreo para detectar OT en retraso.
 
+**Tarifa de taller externo** (campo opcional). Es lo que cobraría un taller
+externo por ese servicio completo (mano de obra). Cuando una OT consuma ese
+servicio, el sistema lo usa junto con el `precio de venta` de los productos
+para calcular el ahorro vs. cotización externa. Si aún no tiene la cotización,
+déjelo en blanco y edítelo cuando la consiga.
+
 ---
 
 ## 8. Órdenes de Trabajo
@@ -473,13 +485,25 @@ no ve una sección o un botón, solicite el permiso al administrador.
 ## 12. Finanzas del Taller — Viabilidad del Proyecto
 
 ⭐ **Esta sección es para personal administrativo.** Permite registrar la
-inversión inicial del taller y los gastos fijos mensuales para medir si el
-proyecto va dando retorno (ROI) o si todavía está absorbiendo capital.
+inversión inicial del taller y los gastos fijos mensuales para medir cuánto
+capital está consumiendo el proyecto y, cuando estén capturados los precios
+de referencia, cuánto está ahorrando vs taller externo.
 
 El módulo vive bajo **Finanzas TTPN → Viabilidad de Proyectos** y comparte
 estructura con cualquier otro proyecto futuro (Servicio a Terceros,
 Capacitación, etc.) — todos se reportan con la misma vista filtrando por
 proyecto.
+
+> **Importante sobre el ingreso del taller propio (lectura previa).** El
+> taller de TTPN no factura a terceros todavía; sirve a la flota interna.
+> Eso significa que **no hay "ingreso" en sentido estricto**. La métrica
+> útil hoy es el **burn rate** (capital que estás invirtiendo + gasto fijo
+> que estás absorbiendo) y, cuando los productos tengan **Precio de venta**
+> (sección 5) y los servicios tengan **Tarifa de taller externo**
+> (sección 7), el sistema podrá calcular el **ahorro estimado** por OT
+> interna (lo que TTPN se habría gastado en taller externo, menos el costo
+> real). Hasta que esos datos existan, el dashboard solo muestra burn rate
+> y deja en cero el indicador de ingreso/ROI.
 
 ### 12.1 Concepto del módulo
 
@@ -487,8 +511,10 @@ Tres entidades:
 
 1. **Proyecto** — La "bolsa" donde se acumulan los movimientos del Taller.
    Ya viene creado por defecto como **Taller Mecánico TTPN** con la marca
-   "OTs taller", que significa: el sistema **suma automáticamente** como
-   ingreso el `materials_cost` de cada OT cerrada (sin teclear nada).
+   "Manual" (sin revenue automático todavía). Cuando el sistema pueda
+   calcular ahorro estimado (requiere precio de venta en productos y tarifa
+   externa en servicios), se cambiará la marca a "Ahorro interno" para que
+   el dashboard lo sume automáticamente.
 2. **Concepto** — La plantilla del movimiento: *"Luz"*, *"Renta del local"*,
    *"Compra de compresor"*. Se da de alta una sola vez y se reusa cada mes.
 3. **Movimiento** — El valor real de la factura del mes para un concepto
@@ -523,14 +549,16 @@ Si necesita crear un proyecto adicional (ej. *Servicio a Terceros*),
 | Slug | Se autogenera del nombre; déjelo en blanco al crear |
 | Descripción | Para qué es el proyecto |
 | Fecha inicio | Cuándo arrancó (clave para medir ROI desde el día 1) |
-| Revenue automático | **Manual** si los ingresos son externos · **OTs del taller** si quiere que sume materials_cost de OTs |
+| Revenue automático | **Manual** mientras no se cierren cotizaciones externas · cambiará a "ahorro interno" cuando productos y servicios tengan precio de referencia |
 | Proyecto activo | Déjelo encendido |
 
 ![Formulario Nuevo Proyecto](img/finanzas/02-proyecto-form.png)
 
-> **Sobre "Revenue automático":** solo un proyecto por unidad de negocio
-> debería tener "OTs taller" — si lo asigna a varios, el `materials_cost`
-> se contaría dos veces.
+> **Sobre "Revenue automático":** hoy el taller TTPN está en **Manual** —
+> el dashboard no infla el ingreso con el costo del material ya pagado.
+> Cuando se conecte el ahorro automático (sale_price + external_rate),
+> solo UN proyecto por unidad de negocio puede tener esa marca para evitar
+> doble conteo.
 
 ### 12.4 Dar de alta los conceptos del taller
 
@@ -609,8 +637,8 @@ Por defecto desde el inicio del proyecto hasta el mes actual.
 | --- | --- | --- |
 | **Inversión** | Suma de todos los movimientos de tipo Inversión desde siempre | Lo que "metió" al proyecto. No depende del rango — siempre es lifetime. |
 | **Gasto fijo (rango)** | Σ gastos fijos del periodo seleccionado · debajo: lifetime | Cuánto le cuesta operar al taller en ese rango. El "lifetime" abajo es desde el día uno. |
-| **Ingreso (rango)** | Σ ingresos manuales + automáticos de OTs en el rango · debajo: lifetime | Cuánto ha entrado. Incluye `materials_cost` de OTs si el proyecto tiene "OTs taller". |
-| **Neto lifetime** | Ingreso − Inversión − Gasto fijo (todo lifetime). ROI% = neto/inversión × 100 | **Rojo = todavía pierdes capital. Verde = ya tienes utilidad real.** El ROI% te dice qué tanto. |
+| **Ingreso (rango)** | Σ ingresos manuales del rango · debajo: lifetime. **HOY: $0** porque el taller no factura a terceros y aún no se conecta el ahorro automático. | Cuando exista, mostrará el ahorro vs taller externo o las facturas a clientes externos. |
+| **Neto lifetime** | Ingreso − Inversión − Gasto fijo (todo lifetime). ROI% = neto/inversión × 100 | Hoy aparecerá **rojo** porque solo hay egresos. Es **normal**: estás en fase de inversión + burn rate, no en operación con ingreso. |
 
 En el ejemplo de la captura: invertimos **$53,500**, llevamos
 **$74,280** de gasto fijo y solo **$340** de ingreso (las OTs apenas
