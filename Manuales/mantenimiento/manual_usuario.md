@@ -25,6 +25,7 @@ depende de la anterior, así que conviene leerlo y aplicarlo en este orden.
 9. [Salidas / consumo (residuo de líquidos)](#9-salidas--consumo)
 10. [Tablero de Monitoreo](#10-tablero-de-monitoreo)
 11. [Estados y permisos](#11-estados-y-permisos)
+12. [Finanzas del Taller — Viabilidad del Proyecto](#12-finanzas-del-taller--viabilidad-del-proyecto) ⭐
 
 ---
 
@@ -463,8 +464,203 @@ no ve una sección o un botón, solicite el permiso al administrador.
 
 ---
 
+## 12. Finanzas del Taller — Viabilidad del Proyecto
+
+⭐ **Esta sección es para personal administrativo.** Permite registrar la
+inversión inicial del taller y los gastos fijos mensuales para medir si el
+proyecto va dando retorno (ROI) o si todavía está absorbiendo capital.
+
+El módulo vive bajo **Finanzas TTPN → Viabilidad de Proyectos** y comparte
+estructura con cualquier otro proyecto futuro (Servicio a Terceros,
+Capacitación, etc.) — todos se reportan con la misma vista filtrando por
+proyecto.
+
+### 12.1 Concepto del módulo
+
+Tres entidades:
+
+1. **Proyecto** — La "bolsa" donde se acumulan los movimientos del Taller.
+   Ya viene creado por defecto como **Taller Mecánico TTPN** con la marca
+   "OTs taller", que significa: el sistema **suma automáticamente** como
+   ingreso el `materials_cost` de cada OT cerrada (sin teclear nada).
+2. **Concepto** — La plantilla del movimiento: *"Luz"*, *"Renta del local"*,
+   *"Compra de compresor"*. Se da de alta una sola vez y se reusa cada mes.
+3. **Movimiento** — El valor real de la factura del mes para un concepto
+   (la luz de enero costó $1,480; la de febrero $1,620). Un concepto
+   recurrente acumula un movimiento por mes.
+
+### 12.2 Tipos de movimiento
+
+| Tipo | Cuándo usar | Ejemplo |
+| --- | --- | --- |
+| **Inversión** | Compras one-time del arranque o expansión | Compra del compresor, juego de herramientas |
+| **Gasto fijo** | Costo recurrente (mensual/trimestral/anual), aunque el monto varíe | Renta, luz, agua, internet, salarios |
+| **Ingreso** | Cobros manuales (cuando arranque servicio a terceros) | Factura a flotilla externa |
+
+> **Nota:** No captures aquí compras de aceite o refacciones — esas van en
+> **Recepciones** (sección 6). El ingreso por OTs del taller se calcula
+> solo, no se captura.
+
+### 12.3 Dar de alta el proyecto del taller
+
+El proyecto **Taller Mecánico TTPN** ya está creado. Para verlo o editarlo:
+**Finanzas TTPN → Proyectos**.
+
+![Listado de proyectos](img/finanzas/01-proyectos-listado.png)
+
+Si necesita crear un proyecto adicional (ej. *Servicio a Terceros*),
+**Nuevo Proyecto** y llene:
+
+| Campo | Qué poner |
+| --- | --- |
+| Nombre | Nombre descriptivo (ej. *"Servicio a Terceros"*) |
+| Slug | Se autogenera del nombre; déjelo en blanco al crear |
+| Descripción | Para qué es el proyecto |
+| Fecha inicio | Cuándo arrancó (clave para medir ROI desde el día 1) |
+| Revenue automático | **Manual** si los ingresos son externos · **OTs del taller** si quiere que sume materials_cost de OTs |
+| Proyecto activo | Déjelo encendido |
+
+![Formulario Nuevo Proyecto](img/finanzas/02-proyecto-form.png)
+
+> **Sobre "Revenue automático":** solo un proyecto por unidad de negocio
+> debería tener "OTs taller" — si lo asigna a varios, el `materials_cost`
+> se contaría dos veces.
+
+### 12.4 Dar de alta los conceptos del taller
+
+**Mantenimiento → Finanzas TTPN → Viabilidad de Proyectos →** elija el
+proyecto en el selector superior → tab **Conceptos**.
+
+![Tab Conceptos](img/finanzas/04-conceptos.png)
+
+Use **Nuevo concepto** para cada concepto del taller. Lo recomendado para
+arrancar:
+
+| Concepto | Tipo | Frecuencia | Monto sugerido |
+| --- | --- | --- | --- |
+| Compra de compresor industrial | Inversión | Una sola vez | costo real |
+| Herramientas y juego inicial | Inversión | Una sola vez | costo real |
+| Renta del local | Gasto fijo | Mensual | renta mensual |
+| Luz | Gasto fijo | Mensual | promedio (sirve solo de sugerencia) |
+| Agua | Gasto fijo | Mensual | promedio |
+| Internet | Gasto fijo | Mensual | tarifa |
+| Servicio a terceros | Ingreso | Mensual | déjelo en 0 hasta que arranque |
+
+![Formulario Nuevo Concepto](img/finanzas/05-concepto-form.png)
+
+Campos importantes:
+
+- **Tipo** y **Frecuencia** definen cómo se cataloga (no automatiza nada
+  — la frecuencia es informativa).
+- **Monto sugerido** prellena el campo Monto cuando captura el movimiento
+  del mes; siempre puede sobrescribirlo con el monto real de la factura.
+- **Proveedor** se vincula al catálogo de proveedores TTPN (útil para
+  agrupar gasto por proveedor).
+- **Activo**: desactive un concepto que ya no aplica (ej. *"Renta vieja"*).
+  Los inactivos no aparecen en el dropdown del Movimiento.
+
+> **Regla:** Un mismo concepto no puede tener dos movimientos del mismo
+> mes (no puedes capturar *"Luz de Enero 2026"* dos veces). Si te
+> equivocaste, **edita** el movimiento existente en lugar de crear otro.
+
+### 12.5 Capturar movimientos cada mes
+
+Tab **Movimientos** → **Nuevo movimiento**.
+
+![Tab Movimientos](img/finanzas/06-movimientos.png)
+
+Cada vez que llega una factura (luz de junio, renta de junio, etc.):
+
+1. **Concepto** — Seleccione el concepto al que pertenece la factura.
+   El sistema prellena el Monto con el valor sugerido del concepto.
+2. **Fecha** — La fecha de la factura. El periodo (YYYY-MM) se deriva
+   automáticamente para agrupar movimientos.
+3. **Monto** — El monto **real** que pagó este mes (no el sugerido).
+4. **Factura** (opcional) — Número de folio para trazabilidad.
+5. **Notas** (opcional) — Cualquier comentario contextual.
+
+![Formulario Nuevo Movimiento](img/finanzas/07-movimiento-form.png)
+
+> Para **inversiones one-time**, simplemente capture un solo movimiento
+> con la fecha y monto real de la compra. No necesita repetirlo cada mes.
+
+#### Filtro por periodo
+
+Arriba del listado de Movimientos hay un campo **Periodo (YYYY-MM)** para
+filtrar solo los del mes que quiera revisar (ej. `2026-03` muestra los
+movimientos de marzo).
+
+### 12.6 Cómo leer el Dashboard
+
+Tab **Dashboard**. Arriba elija el rango con **Desde / Hasta** (YYYY-MM).
+Por defecto desde el inicio del proyecto hasta el mes actual.
+
+![Dashboard con datos reales](img/finanzas/03-dashboard.png)
+
+#### Las 4 tarjetas (KPIs)
+
+| Tarjeta | Qué significa | Cómo interpretar |
+| --- | --- | --- |
+| **Inversión** | Suma de todos los movimientos de tipo Inversión desde siempre | Lo que "metió" al proyecto. No depende del rango — siempre es lifetime. |
+| **Gasto fijo (rango)** | Σ gastos fijos del periodo seleccionado · debajo: lifetime | Cuánto le cuesta operar al taller en ese rango. El "lifetime" abajo es desde el día uno. |
+| **Ingreso (rango)** | Σ ingresos manuales + automáticos de OTs en el rango · debajo: lifetime | Cuánto ha entrado. Incluye `materials_cost` de OTs si el proyecto tiene "OTs taller". |
+| **Neto lifetime** | Ingreso − Inversión − Gasto fijo (todo lifetime). ROI% = neto/inversión × 100 | **Rojo = todavía pierdes capital. Verde = ya tienes utilidad real.** El ROI% te dice qué tanto. |
+
+En el ejemplo de la captura: invertimos **$53,500**, llevamos
+**$74,280** de gasto fijo y solo **$340** de ingreso (las OTs apenas
+arrancaron). Neto −$127,440 · ROI −238%. Eso es **normal en taller nuevo**:
+todavía está en fase de inversión y costo fijo, antes del break-even.
+
+#### Gráfica "Serie mensual"
+
+Muestra mes a mes:
+
+- **Línea verde** = ingreso (manual + automático de OTs)
+- **Línea amarilla** = gasto fijo
+- **Línea morada** = inversión (típicamente pico en los primeros meses)
+
+Para que el proyecto sea viable, la línea verde debe crecer hasta cruzar
+y superar a la amarilla, y los picos morados deben recuperarse.
+
+#### Desglose por concepto (rango)
+
+Tabla al final del dashboard. Lista cada concepto que tuvo movimientos en
+el rango con su total. Sirve para detectar:
+
+- Qué gasto fijo está pesando más (¿la luz subió mucho?).
+- Cuál fue el desglose de la inversión inicial.
+- Qué fuentes están aportando ingreso.
+
+#### Indicador de Break-even
+
+Debajo de las tablas aparece uno de estos mensajes:
+
+- 🎉 **"Break-even alcanzado en YYYY-MM"** — el ingreso acumulado superó
+  inversión + gasto fijo en ese mes. A partir de ahí, todo lo que entra
+  es utilidad real.
+- *"Aún no se ha alcanzado el break-even del proyecto en el rango
+  analizado."* — el taller sigue absorbiendo capital. Normal en los
+  primeros meses.
+
+### 12.7 Buenas prácticas
+
+1. **Capture la factura el mismo día que llega.** Evita que se acumulen.
+2. **Use el monto real, no el sugerido.** El monto sugerido es solo una
+   ayuda de captura.
+3. **Revise el dashboard al cierre del mes.** Es cuando se ve si los
+   gastos están bajo control o si hay un servicio que se disparó.
+4. **No edite movimientos viejos sin nota.** Si necesita ajustar el monto
+   de la luz de febrero, agregue en "Notas" el motivo (*"corrección por
+   recargos no facturados"*).
+5. **Cuando arranque a facturar terceros**, cambie el concepto *"Servicio
+   a terceros"* a `Ingreso` activo y capture el monto al cobrar cada
+   servicio. Los ingresos automáticos de OTs internas siguen sumando aparte.
+
+---
+
 ### Documentos relacionados
 
 - Esquema de datos: [`../../Backend/dominio/mantenimiento/schema.sql`](../../Backend/dominio/mantenimiento/schema.sql)
 - Modelo de costo de líquidos: [`../../Backend/dominio/mantenimiento/costeo_liquidos.md`](../../Backend/dominio/mantenimiento/costeo_liquidos.md)
 - Endpoints API: [`../../Backend/dominio/mantenimiento/controller/endpoints.md`](../../Backend/dominio/mantenimiento/controller/endpoints.md)
+- Módulo Finanzas / Viabilidad: [`../../Backend/dominio/finanzas/viabilidad/viabilidad_proyectos.md`](../../Backend/dominio/finanzas/viabilidad/viabilidad_proyectos.md)
