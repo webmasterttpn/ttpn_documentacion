@@ -372,6 +372,41 @@ en **Residuo devuelto**. El sistema:
 - En el siguiente consumo, **gasta primero el residuo recuperado** (a $0) y
   luego el stock a costo promedio.
 
+#### 9.1.1 Cómo capturar el residuo paso a paso ⭐
+
+**Mantenimiento → Salidas → Nueva Salida** y llene:
+
+1. **Tipo *** = `Orden de Trabajo` (si el residuo viene de consumo de un
+   trabajo). Para residuo de un proceso departamental use `Departamental`.
+2. **Orden de Trabajo *** = la OT donde se generó el residuo (en el ejemplo,
+   `OT-2026-001`).
+3. **Motivo** = una descripción corta (ej. *“Cambio de aceite OT”*).
+4. En **Productos**, en la línea del producto líquido:
+   - **Producto** = el líquido (ej. `AC530 · Aceite Motor 5W-30`).
+   - **Cantidad** = la cantidad **total entregada** a la OT, en unidad base
+     (ej. **`5`** litros, NO 5 cajas).
+   - **Residuo devuelto** = la cantidad **reutilizable** que sobra y vuelve al
+     inventario (ej. **`1.5`** litros). Justo debajo de este campo se ve la
+     pista `Reutilizable ($0)` — es el indicador de que esa cantidad **no
+     toca el costo promedio** (entra al bucket recuperado a $0).
+5. **Guardar**. La salida queda en `draft` o `in_progress`.
+6. En la lista, use **Procesar** para que el sistema:
+   - Descuente del inventario los **5 L** consumidos a costo promedio.
+   - Cargue el **`line_cost`** = `5 × costo promedio` al expediente de la OT.
+   - Reingrese los **1.5 L** como “recuperado a $0”, **sin alterar** el costo
+     promedio.
+
+![Formulario Salida con Residuo devuelto = 1.5 (Reutilizable $0)](img/form-salida-residuo.png)
+
+**⚠️ Cuándo NO capturar residuo.** Captura `Residuo devuelto` solo cuando el
+sobrante **se va a reutilizar**. Si el sobrante se desperdició/contaminó,
+déjelo en `0` — en ese caso los 5 L se consideran totalmente consumidos.
+
+**💡 Qué pasa en la siguiente salida.** La próxima vez que se consuma del mismo
+producto (otra OT u otra área), el sistema **descuenta primero del recuperado**
+(a $0) antes de tocar el stock a costo promedio. Se ve como un ahorro en el
+`line_cost` de esa nueva salida.
+
 > Ejemplo real (datos demo): se entregaron **5 L** de aceite a una OT y se
 > devolvieron **1.5 L** reutilizables. Inventario del aceite: 200 − 5 + 1.5 =
 > **196.5 L**, con **1.5 L recuperados a $0** y el costo promedio intacto en
