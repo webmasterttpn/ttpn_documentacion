@@ -309,6 +309,23 @@ de qué caja salió el aceite.
 > indispensable que la *Presentación* tenga bien capturadas el *envase* y los
 > *envases por paquete* (sección 4).
 
+### 6.5 Ver el detalle de una recepción
+
+Haga **click en el renglón** (o en el ícono 👁 a la derecha) para abrir el
+diálogo de detalle. Verá:
+
+- **Encabezado**: folio, estado (Borrador / En proceso / Completada /
+  Cancelada), proveedor, fecha de recepción, fecha de factura, **factura del
+  proveedor**, **factura fiscal (CFDI)**, almacén, quién recibió, total
+  facturado.
+- **Productos recibidos**: por cada línea — producto (nombre + CLV +
+  unidad base), presentación capturada, cantidad facturada, cantidad aceptada,
+  costo unitario, total de la línea, lote y fecha de caducidad.
+
+En pantallas pequeñas (celular) el diálogo se expande a pantalla completa y
+los productos se muestran como **tarjetas apiladas** en vez de tabla
+horizontal, para que se lean cómodamente sin scroll lateral.
+
 ---
 
 ## 7. Servicios de Taller
@@ -346,7 +363,9 @@ vehículo.
   cuando el trabajo es **para un cliente externo** (entonces se ocultan
   Vehículo y Mantenimiento programado y aparecen *Cliente externo* + *Vehículo
   del cliente (placa/modelo)*).
-- **Tipo** (preventivo / correctivo / otro).
+- **Tipo** — selector con **Correctivo**, **Preventivo** u **Otro**
+  (las etiquetas se muestran siempre en español; el sistema las guarda
+  internamente como `corrective` / `preventive` / `other`).
 - **Mecánico** — un empleado responsable (uno por OT).
 - **Vehículo** (solo OT internas, opcional).
 - **Cliente externo** (solo OT externas, **obligatorio**).
@@ -460,8 +479,27 @@ producto (otra OT u otra área), el sistema **descuenta primero del recuperado**
 
 Esto es intencional y se llama *método de costo hundido*: el costo del líquido
 se reconoce completo en la primera salida; el residuo se reaprovecha sin
-distorsionar costos ni generar “costos de retorno”. Detalle contable en
+distorsionar costos ni generar "costos de retorno". Detalle contable en
 [`../../Backend/dominio/mantenimiento/costeo_liquidos.md`](../../Backend/dominio/mantenimiento/costeo_liquidos.md).
+
+### 9.2 Ver el detalle de una salida
+
+Click en el renglón (o en el ícono 👁) abre el diálogo de detalle. Incluye:
+
+- **Encabezado**: folio, **tipo** (*Departamental* / *Orden de trabajo*),
+  estado (Borrador / Pendiente de aprobación / Aprobada / Completada /
+  Cancelada), OT vinculada cuando aplica, fechas de solicitud / aprobación /
+  entrega, y los usuarios que **solicitó**, **aprobó** y **entregó**.
+- **Productos consumidos**: por línea — producto, cantidades **solicitada /
+  aprobada / entregada**, porción **a costo promedio**, porción **recuperada
+  $0** (residuo reutilizado), **residuo devuelto** y costo total de la línea.
+
+Igual que en Recepciones, en móvil cada producto se muestra como tarjeta
+apilada para evitar scroll lateral.
+
+> **Por qué importa**: el detalle permite auditar de un vistazo qué se cargó
+> al taller / OT y cuánto se ahorró gracias a residuo recuperado (líneas en
+> verde). La conciliación con el módulo de Finanzas usa estos mismos números.
 
 ---
 
@@ -636,8 +674,14 @@ movimientos de marzo).
 
 ### 12.6 Cómo leer el Dashboard
 
-Tab **Dashboard**. Arriba elija el rango con **Desde / Hasta** (YYYY-MM).
-Por defecto desde el inicio del proyecto hasta el mes actual.
+Tab **Dashboard**. Arriba está el **selector de rango de fechas** estilo
+calendario: pique la fecha de inicio y luego la de fin para definir el
+rango. Es **día a día** — puede analizar una quincena, un mes, un
+trimestre o varios años de un solo tirón. Antes era un *input* con formato
+`YYYY-MM`; ahora es un calendario visual. El rango elegido alimenta todos
+los tabs (Dashboard, Conceptos, Movimientos y Servicios del Taller).
+
+Por defecto el rango es **desde el 1° de enero del año en curso hasta hoy**.
 
 ![Dashboard con datos reales](img/finanzas/03-dashboard.png)
 
@@ -699,6 +743,55 @@ Debajo de las tablas aparece uno de estos mensajes:
 5. **Cuando arranque a facturar terceros**, cambie el concepto *"Servicio
    a terceros"* a `Ingreso` activo y capture el monto al cobrar cada
    servicio. Los ingresos automáticos de OTs internas siguen sumando aparte.
+
+### 12.8 Operación del taller en el Dashboard
+
+Cuando el proyecto seleccionado tiene `auto_revenue_source = mtto_*`
+(taller), debajo de las KPIs financieras aparece el panel **Operación
+del taller** con 5 widgets más:
+
+1. **Vehículos atendidos por semana** — gráfica de barras (semanas ISO en X,
+   cantidad de unidades distintas atendidas en Y). Solo vehículos de la
+   **flota TTPN** (no clientes externos).
+2. **Servicios más solicitados** — top 5 del rango: nombre del servicio +
+   cuántas OT lo incluyeron.
+3. **Servicios por vehículo** — top 10 de la flota: vehículo (CLV · placa)
+   y total de servicios recibidos.
+4. **Horas y servicios por mecánico** — horas reales (derivadas de
+   `activated_at → completed_at`), OTs cerradas y total de servicios
+   prestados, ordenado por horas descendente. Incluye OTs internas y
+   externas.
+5. **Mayor atraso** — top 10 OTs donde el tiempo real superó al estimado:
+   muestra OT, vehículo/cliente, mecánico, estimado, real, exceso en
+   minutos y porcentaje. Sirve para detectar trabajos que sistemáticamente
+   se pasan del tiempo estándar.
+
+**Tiempo real sin polling**: el panel se calcula en el servidor con un
+script Python especializado (`scripts/mtto/workshop_ops_kpis.py`) y el
+resultado llega por WebSocket cuando el job termina. Esto permite manejar
+rangos de 1+ año sin saturar la memoria del navegador ni del API. Si tarda
+un par de segundos en aparecer es **normal** — está procesando agregaciones
+en Postgres.
+
+### 12.9 Texto en español en todas las listas
+
+Los enums internos del sistema (`completed`, `in_progress`, `corrective`,
+`monthly`, `weekly`, etc.) se almacenan en inglés en la base de datos pero
+**siempre se muestran traducidos** en la interfaz:
+
+| Concepto | Cómo lo ve el usuario |
+| --- | --- |
+| Estado OT | Borrador · Activada · En progreso · En pausa · Completada · Cancelada |
+| Tipo OT | Correctivo · Preventivo · Otro |
+| Estado Salida | Borrador · Pendiente de aprobación · Aprobada · Completada · Cancelada |
+| Tipo Salida | Departamental · Orden de trabajo |
+| Estado Recepción | Borrador · En proceso · Completada · Cancelada |
+| Frecuencia Conceptos | Una sola vez · Diaria · Semanal · Mensual · Bimestral · Trimestral · Semestral · Anual |
+| Tipo Concepto | Inversión · Gasto fijo · Ingreso |
+| Movimiento Inventario | Entrada (recepción) · Salida (consumo) · Devolución de residuo · Ajuste · Merma / daño |
+
+La traducción vive en un solo lugar (`src/utils/enumLabels.js`) para evitar
+inconsistencias entre pantallas.
 
 ---
 
