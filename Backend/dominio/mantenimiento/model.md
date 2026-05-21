@@ -117,6 +117,24 @@ o desperdicio). El proyecto financiero con
 `auto_revenue_source: 'mtto_internal_savings'` suma este número como
 revenue mensual del dashboard (agrupa por `completed_at`).
 
+**Interno vs Externo (migración `20260522000001`):**
+
+- `is_external` (boolean, NOT NULL, default false): marca si la OT es para
+  flota propia TTPN (`false`) o para un cliente externo (`true`).
+- `external_customer_name` (string): nombre del cliente externo. **Obligatorio
+  cuando `is_external = true`** (validación de modelo).
+- `external_vehicle_label` (string): placa/modelo del vehículo del cliente,
+  texto libre (no FK a `vehicles`).
+- Callback `before_validation :clear_internal_refs_when_external` limpia
+  `vehicle_id` y `scheduled_maintenance_id` automáticamente cuando la OT se
+  marca externa — evita contaminar el filtro "servicios a camionetas de TTPN"
+  en la vista de viabilidad.
+- Scopes: `internal` (`where(is_external: false)`) y
+  `external` (`where(is_external: true)`).
+- Semánticamente `estimated_savings` significa:
+  - Internas: "ahorro vs. taller externo".
+  - Externas: "profit por servir al cliente" (es la misma operación contable).
+
 `WorkOrderProgressService#call(:cancel)` **bloquea** la cancelación si hay
 transfers completadas — exige que el operador reverse el consumo antes de
 poder cancelar. Sin este check, el inventario quedaba descontado contra una

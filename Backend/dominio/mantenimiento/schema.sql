@@ -192,10 +192,14 @@ CREATE TABLE mtto_work_orders (
     requested_by_id BIGINT, activated_by_id BIGINT, -- admin que activa (fase 1)
     business_unit_id BIGINT REFERENCES business_units(id),
     created_by_id BIGINT, updated_by_id BIGINT,
+    is_external BOOLEAN NOT NULL DEFAULT false,    -- migración 20260522000001
+    external_customer_name VARCHAR,                  -- requerido si is_external
+    external_vehicle_label VARCHAR,                  -- placa/modelo del cliente
     created_at TIMESTAMP NOT NULL DEFAULT now(),
     updated_at TIMESTAMP NOT NULL DEFAULT now(),
     UNIQUE (work_order_number, business_unit_id)
 );
+CREATE INDEX idx_mtto_wo_is_external ON mtto_work_orders(is_external);
 
 -- 11. SERVICIOS DE LA OT (alcance)
 CREATE TABLE mtto_work_order_services (

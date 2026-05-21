@@ -45,6 +45,48 @@ No encontrado: `{ error: ... }` (404). Sin token: 401.
 
 Transición/recepción/salida inválida → 422 `{ error: ... }`.
 
+### `GET /mtto/work_orders/weekly_summary`
+
+Resumen semanal de OT completadas para la vista de viabilidad
+(`/finanzas/viabilidad`, tab "Servicios del Taller").
+
+Params:
+
+- `from` (ISO date, default: hace 8 semanas).
+- `to` (ISO date, default: hoy).
+
+Respuesta:
+
+```text
+{
+  "from", "to",
+  "weeks": ["2026-W18", "2026-W19", ...],   # eje ISO (lunes-domingo)
+  "internal": {
+    "totals_per_week": { "2026-W18": 4, ... },
+    "services": [
+      { "service_id", "service_name",
+        "counts_per_week": { "2026-W18": 3, ... },
+        "products": [
+          { "product_id", "name", "unit", "sale_price",
+            "per_week": { "2026-W18": { "qty", "cost", "avg_cost" }, ... } }
+        ] }
+    ]
+  },
+  "external": { ...,
+    "per_week" extra de cada producto: { "qty", "cost", "avg_cost",
+                                          "sale_price", "revenue", "profit" }
+  }
+}
+```
+
+Filtra por `Current.business_unit`, solo OTs `status='completed'` con
+`completed_at` en el rango. La sección `external` agrega `revenue`
+(`qty × sale_price`) y `profit` (`revenue − cost`) por celda para la
+narrativa financiera del taller atendiendo clientes externos.
+
+Servicio: `Mtto::WorkshopWeeklySummaryService`. Sin paginación
+(rango temporal pequeño).
+
 ## Tiempo real
 
 Canal `MttoWorkOrdersChannel` → `stream_from "mtto_work_orders_#{bu_id}"`.

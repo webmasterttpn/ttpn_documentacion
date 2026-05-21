@@ -341,15 +341,25 @@ vehículo.
 
 **Nueva OT** → capture:
 
+- **Servicio a cliente externo (no flota TTPN)** — toggle al inicio del
+  formulario. Déjelo apagado para OT sobre **camionetas de TTPN**; actívelo
+  cuando el trabajo es **para un cliente externo** (entonces se ocultan
+  Vehículo y Mantenimiento programado y aparecen *Cliente externo* + *Vehículo
+  del cliente (placa/modelo)*).
 - **Tipo** (preventivo / correctivo / otro).
 - **Mecánico** — un empleado responsable (uno por OT).
-- **Vehículo** (opcional).
+- **Vehículo** (solo OT internas, opcional).
+- **Cliente externo** (solo OT externas, **obligatorio**).
+- **Vehículo del cliente** (texto libre, opcional).
 - **Descripción**.
 - **Servicios** — uno o varios del catálogo (sección 7). El **tiempo estimado
   total** se calcula como la suma de los tiempos estándar de los servicios
   elegidos.
 
 ![Formulario de OT](img/form-ot.png)
+
+> Esta marca alimenta el desglose **Interno (TTPN) vs Externo** en la nueva
+> vista [Viabilidad — Servicios del Taller](#12-viabilidad-del-proyecto--servicios-del-taller-por-semana).
 
 ### 8.2 Ciclo de vida (Fase 1)
 
@@ -689,6 +699,55 @@ Debajo de las tablas aparece uno de estos mensajes:
 5. **Cuando arranque a facturar terceros**, cambie el concepto *"Servicio
    a terceros"* a `Ingreso` activo y capture el monto al cobrar cada
    servicio. Los ingresos automáticos de OTs internas siguen sumando aparte.
+
+---
+
+## 12. Viabilidad del Proyecto — Servicios del Taller por semana
+
+Vista de análisis para entender el flujo del taller: **cuántos servicios se
+dieron por semana**, separados entre flota **interna TTPN** y trabajos a
+**clientes externos**, desglosados por tipo de servicio del catálogo, con
+expansión por fila para ver productos consumidos + costo promedio. Vive como
+tab dentro de **Finanzas → Viabilidad de Proyectos → Servicios del Taller**.
+
+### 12.1 Cómo se alimenta la vista
+
+- Solo cuentan OTs con `status = completed` en el rango de fechas elegido.
+- La separación interno/externo viene del toggle **Servicio a cliente externo**
+  del formulario de OT (sección 8).
+- Los productos vienen de las Salidas (sección 9) procesadas contra la OT.
+
+### 12.2 Cómo leer la tabla
+
+- **Sección Interno (Flota TTPN, azul)**: filas por servicio del catálogo,
+  columnas por semana ISO (`Sem 20/2026` = semana 20 del 2026). Cada celda es
+  cuántas OT internas incluyeron ese servicio esa semana. Expandir la fila
+  muestra los productos consumidos y su **costo promedio** por semana.
+- **Sección Externo (Clientes, naranja)**: misma estructura, pero al expandir
+  cada producto muestra además **ingreso** (`cantidad × precio de venta`) y
+  **profit** (`ingreso − costo`). Esto refleja la ganancia del taller al
+  servir a clientes externos.
+- **Toggle Servicios / Productos** en la cabecera: cambia el desglose entre
+  "por servicio del catálogo" (default) y "por producto consumido".
+
+### 12.3 Filtros
+
+- **Desde / Hasta**: rango de fechas. Por defecto las **últimas 8 semanas**.
+- **Refrescar**: recarga los datos contra el endpoint.
+
+### 12.4 Reglas de negocio importantes
+
+1. Una OT cuenta una sola vez por semana en `total_per_week`, aunque incluya
+   varios servicios.
+2. Si una OT cubre varios servicios (ej. *cambio de aceite* + *balatas*) y
+   consume aceite + balatas, los productos aparecen bajo **ambos** servicios
+   en el desglose. Esto es una simplificación: el modelo no asocia un producto
+   a un servicio específico dentro de la OT.
+3. Para externos, `precio de venta` se toma de **Producto.sale_price** y
+   `external_rate` del catálogo de **Servicios** (visible en cada catálogo).
+   Si están en `$0`, la columna **profit** mostrará valores negativos (señal
+   de capturar el precio de venta).
+4. `costo promedio` es el `unit_cost_charged` con el que se procesó la salida.
 
 ---
 
