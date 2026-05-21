@@ -16,6 +16,7 @@ Documentacion/
 ├── Frontend/        → Vue/Quasar: componentes, patrones, páginas, integraciones
 ├── Manuales/        → Manuales de usuario final (con capturas)
 ├── N8N/             → Automatización: setup, deploy, credenciales
+├── Proyectos/       → PRDs y manuales de proyectos satélite (portal de proveedores, etc.)
 └── _archivo/        → Notas internas (NO incluir en entrega al cliente)
 ```
 
@@ -91,6 +92,17 @@ Documentacion/
 | [setup/](N8N/setup/) | Checklist de configuración inicial |
 | [deploy/](N8N/deploy/) | Deploy en Railway |
 | [credenciales/](N8N/credenciales/) | Gestión de credenciales y testing |
+
+---
+
+## Proyectos satélite
+
+Proyectos nuevos que extienden Kumi y se documentan a parte (PRD,
+manuales para developers, prompts de mockup, flujos).
+
+| Proyecto | Descripción |
+| --- | --- |
+| [Proveedores/](Proyectos/Proveedores/) | Portal de Proveedores TTPN — PWA nueva para que proveedores gestionen sus facturas; extensiones BE/FE en Kumi. Incluye PRD, manuales BE/FE/Docker/Supabase, kumi_admin_changes, 7 flujos, seguridad, troubleshooting |
 
 ---
 
