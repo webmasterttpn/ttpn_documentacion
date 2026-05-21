@@ -11,6 +11,39 @@ Actualizar el `Status` y el bloque `Avance` en lugar de crear archivos nuevos.
 
 ---
 
+### DT-021 — Auto-crear `fixed_expense` al recibir mercancía en proyectos Mtto
+**Registrada:** 2026-05-20 | **Dominio:** Backend — mantenimiento/finanzas | **Severidad:** Media
+**Status:** Pendiente — diseño
+
+Hoy `Mtto::ProductReceipt` (compra) y `Mtto::InventoryTransfer` (salida a
+OT) solo tocan `Mtto::Inventory` y `Mtto::InventoryMovement` — **no crean
+filas en `finance_entries`**. Por lo tanto el costo de comprar insumos
+nunca aparece en el dashboard del proyecto y el burn rate está
+subestimado.
+
+Simulación del Taller (ver
+[simulacion_taller_aceite.md](../../Backend/dominio/finanzas/viabilidad/simulacion_taller_aceite.md))
+muestra que el aceite consumido representa **$56,160/mes** que hoy no se
+contabilizan automáticamente.
+
+**Diseño propuesto:** callback `after_commit :sync_finance_expense` en
+`Mtto::ProductReceipt` (al cerrar la recepción, no en draft) que cree un
+`Finance::Entry` tipo `fixed_expense` ligado al proyecto Mtto de la
+misma BU, con `amount = total_amount` y `entry_date = received_at`.
+
+**Bloqueado por (decidir primero):**
+
+- Mapeo BU → Finance::Project: hoy es 1-a-N. Hay que decidir si:
+  (a) por convención el proyecto con `auto_revenue_source ∈ ('mtto_work_orders', 'mtto_internal_savings')` recibe los entries;
+  (b) agregar `mtto_expense_project_id` explícito en `business_units`; o
+  (c) un campo `is_mtto_project` boolean en `finance_projects` con check de unicidad por BU.
+- Qué hacer si no existe proyecto receptor (skip silencioso vs. log).
+- Idempotencia: la `uniqueness scope: :period` del concept impide
+  insertar 2 entries del mismo concept en el mismo mes — el callback
+  debe agregar al monto existente, no fallar.
+
+---
+
 ### DT-020 — Modo de revenue "tarifa externa asumida" sin capturar precios por SKU/servicio
 **Registrada:** 2026-05-20 | **Dominio:** Backend — finanzas | **Severidad:** Baja
 **Status:** Pendiente — diseño
@@ -57,7 +90,14 @@ Finance::Project.find_by(slug: 'taller-mecanico-ttpn')
   .update!(auto_revenue_source: 'mtto_internal_savings')
 ```
 
-Ver `Documentacion/_archivo/session_notes/2026-05-20_mtto_internal_savings_dashboard.md`.
+**Umbral mínimo identificado por simulación**: para el servicio "Cambio de
+aceite" (consumo 4.5 L × $80/L = $360 de material), `external_rate` debe
+ser **≥ $800** para que el ahorro mensual cubra el outflow operativo del
+Taller (~$61,260/mes con 156 OTs y gastos fijos $5,100). Detalle del
+cálculo y sensibilidad en
+[`Backend/dominio/finanzas/viabilidad/simulacion_taller_aceite.md`](../../Backend/dominio/finanzas/viabilidad/simulacion_taller_aceite.md).
+
+Ver también `_archivo/session_notes/2026-05-20_mtto_internal_savings_dashboard.md`.
 
 ---
 
