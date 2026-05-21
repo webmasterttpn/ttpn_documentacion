@@ -10,14 +10,16 @@ ROI / break-even / burn rate de cada uno por separado sin duplicar tablas.
 
 - `name`, `slug` (unique por BU, validación con regex `^[a-z0-9-]+$`).
 - `starts_at`, `is_active`.
-- `auto_revenue_source` ∈ `{'none', 'mtto_work_orders'}` — si es
-  `mtto_work_orders` el Dashboard suma como revenue el `materials_cost` de
-  las OTs `completed` de la BU. **⚠️ Esta opción está deprecated** porque
-  `materials_cost` no es ingreso — es el costo del material ya pagado. Se
-  conserva el valor en el enum por compatibilidad, pero no se debe usar en
-  proyectos nuevos. Próximamente se agregará `'mtto_internal_savings'` que
-  sí calcula ahorro real (precio de venta de productos + tarifa externa de
-  servicios − costo real de OT).
+- `auto_revenue_source` ∈ `{'none', 'mtto_work_orders', 'mtto_internal_savings'}`:
+  - `none` — no se suma revenue automático. Burn rate honesto.
+  - `mtto_work_orders` — el Dashboard suma `line_cost` de transfers
+    `completed` filtrando por `transfer_date`. **⚠️ Deprecated** para taller
+    propio: `line_cost` no es ingreso (es costo de material ya pagado). Útil
+    solo cuando ese material se factura tal cual a un tercero.
+  - `mtto_internal_savings` — el Dashboard suma `estimated_savings` de las
+    OTs `completed` filtrando por `completed_at` (la fecha en que la OT
+    cerró). Es el cálculo correcto para taller propio: el ingreso real es
+    el ahorro contra lo que costaría externamente. Detalle abajo.
 - `has_many :concepts, :entries, dependent: :restrict_with_error` — no se
   destruye un proyecto con movimientos (sería pérdida silenciosa de datos).
 
@@ -28,24 +30,34 @@ los datos para calcular ahorro real).
 ### Datos para calcular ahorro estimado
 
 Estos campos viven en Mantenimiento pero alimentan el ahorro estimado del
-proyecto:
+proyecto. **Default 0, NOT NULL** (migración
+`20260521025531_set_default_zero_on_mtto_pricing`): un producto/servicio sin
+precio capturado aporta 0 al ahorro — no rompe el cálculo, solo lo subestima.
 
-- `mtto_products.sale_price` (decimal opcional) — precio unitario en unidad
-  base del producto cuando se aplica en una OT interna. Migración
-  `20260520231215_add_sale_price_and_external_rate_to_mtto`.
-- `mtto_services.external_rate` (decimal opcional) — lo que cobraría un
-  taller externo por ese servicio completo (mano de obra incluida).
+- `mtto_products.sale_price` (decimal NOT NULL, default 0) — precio unitario
+  en unidad base del producto cuando se aplica en una OT interna. Origen:
+  migración `20260520231215_add_sale_price_and_external_rate_to_mtto`,
+  endurecida en `20260521025531`.
+- `mtto_services.external_rate` (decimal NOT NULL, default 0) — lo que
+  cobraría un taller externo por ese servicio completo (mano de obra
+  incluida). **No se replica por OT** — vive solo en el catálogo
+  `mtto_services` y se lee desde ahí al calcular el ahorro de cada OT.
 
-Cuando ambos estén poblados, el cálculo de ahorro por OT será:
+Cálculo realizado por `Mtto::WorkOrder#estimated_savings`:
 
 ```text
-ahorro_OT = Σ(consumo × producto.sale_price)
-          + Σ(servicios.external_rate)
-          − OT.materials_cost
+internal_market_value = Σ(item.quantity_transferred × product.sale_price)  -- items en transfers completed
+                      + Σ(service.external_rate)                            -- servicios del WO (catálogo)
+estimated_savings     = internal_market_value − materials_cost
 ```
 
+`estimated_savings` puede ser negativo si los materiales reales costaron
+más que el precio externo: señal de alerta (tarifa mal capturada o
+desperdicio en la OT), no error.
+
 El proyecto que tenga `auto_revenue_source: 'mtto_internal_savings'`
-sumará ese ahorro como revenue mensual en el dashboard.
+suma ese ahorro como revenue mensual en el dashboard, agrupando por
+`completed_at` de la OT.
 
 ### `Finance::Concept` (`finance_concepts`)
 

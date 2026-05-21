@@ -28,10 +28,19 @@ stock/consumo. `after_create` crea su `Mtto::Inventory` (reemplaza el trigger SQ
 (OUT_OF_STOCK/REORDER/OVERSTOCK/OK) y scope `low_stock` (reemplazan la vista
 `v_product_stock_status`).
 
+`sale_price` (decimal NOT NULL, default 0): precio unitario en unidad base al que
+el producto se "vendería" / valuaría si saliera por una OT al cliente externo
+equivalente. Alimenta `Mtto::WorkOrder#internal_market_value`. 0 = sin precio
+capturado, no participa en cálculo de ahorro.
+
 ## Mtto::Service
 
 Catálogo de servicios de taller con `standard_time_minutes` (tiempo estándar
 estilo agencia), usado por las OT para estimar tiempo total.
+`external_rate` (decimal NOT NULL, default 0): tarifa que cobraría un taller
+externo por el servicio completo (mano de obra incluida). **Vive solo en el
+catálogo** — no se replica por OT. La OT lo lee del catálogo cuando calcula
+`internal_market_value`. 0 = sin cotización externa, no participa en ahorro.
 
 ## Mtto::SupplierProduct
 
@@ -92,6 +101,21 @@ material consumido (evita pérdida de trazabilidad contable).
 `materials_cost` suma `line_cost` de las transfers `completed` ligadas a la
 OT. Es el número que finanzas usa para conocer el costo real de la OT y se
 expone en el serializer del controller.
+
+`internal_market_value` = Σ (`quantity_transferred × product.sale_price`)
+de los items en transfers `completed` + Σ (`service.external_rate`) leído
+del catálogo `mtto_services` por cada `WorkOrderService` de la OT.
+Representa lo que el trabajo costaría si se hiciera en un taller externo
+("valor de mercado"). Tanto `sale_price` como `external_rate` tienen
+default 0 NOT NULL (migración `20260521025531`) → un producto/servicio sin
+precio capturado aporta 0 (ROI conservador, nunca NULL).
+
+`estimated_savings` = `internal_market_value − materials_cost`. Es el
+ahorro de hacer la OT en taller propio vs. externo. Puede ser **negativo**
+si el costo real superó al precio externo (señal de tarifa mal capturada
+o desperdicio). El proyecto financiero con
+`auto_revenue_source: 'mtto_internal_savings'` suma este número como
+revenue mensual del dashboard (agrupa por `completed_at`).
 
 `WorkOrderProgressService#call(:cancel)` **bloquea** la cancelación si hay
 transfers completadas — exige que el operador reverse el consumo antes de

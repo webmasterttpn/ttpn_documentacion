@@ -11,6 +11,56 @@ Actualizar el `Status` y el bloque `Avance` en lugar de crear archivos nuevos.
 
 ---
 
+### DT-020 — Modo de revenue "tarifa externa asumida" sin capturar precios por SKU/servicio
+**Registrada:** 2026-05-20 | **Dominio:** Backend — finanzas | **Severidad:** Baja
+**Status:** Pendiente — diseño
+
+`mtto_internal_savings` (DT-019) exige capturar `sale_price` por producto y
+`external_rate` por servicio. En la práctica el encargado del taller no va
+a llenar esos campos uno por uno — calcula ROI por fuera con su Excel a
+partir de una **tarifa promedio asumida**.
+
+**Idea:** agregar un 4° valor al enum, p. ej. `'mtto_assumed_external'`,
+que sume por cada OT `completed`:
+
+```text
+revenue_OT = (estimated_total_minutes / 60) × project.assumed_hourly_rate
+```
+
+(No descuenta `materials_cost`: el material ya está absorbido por la
+inversión inicial / gastos del proyecto.) Requiere una columna nueva en
+`finance_projects`: `assumed_hourly_rate` (decimal, default 0).
+
+Pendiente decidir si se enriquece con un `markup` sobre `materials_cost`
+para reflejar que el taller externo cobra material con sobreprecio.
+Ver `_archivo/session_notes/2026-05-20_mtto_internal_savings_dashboard.md`.
+
+---
+
+### DT-019 — Activar `mtto_internal_savings` en el proyecto Taller cuando haya precios
+**Registrada:** 2026-05-20 | **Dominio:** Backend — finanzas/mantenimiento | **Severidad:** Baja
+**Status:** Pendiente — bloqueado por captura de datos
+
+El proyecto **Taller Mecánico TTPN** (seed `20260520215508`) sigue en
+`auto_revenue_source: 'none'` aunque ya está implementada la opción
+`'mtto_internal_savings'` en `Finance::DashboardCalculator` y los métodos
+`Mtto::WorkOrder#internal_market_value` / `#estimated_savings` están listos.
+No se cambió en esta sesión porque los `sale_price` de productos y los
+`external_rate` de servicios están todos en 0 (default de la migración
+`20260521025531`) → activar ahora mostraría revenue 0 en el dashboard y
+confundiría al usuario.
+
+**Acción cuando se hayan capturado los precios reales:**
+
+```ruby
+Finance::Project.find_by(slug: 'taller-mecanico-ttpn')
+  .update!(auto_revenue_source: 'mtto_internal_savings')
+```
+
+Ver `Documentacion/_archivo/session_notes/2026-05-20_mtto_internal_savings_dashboard.md`.
+
+---
+
 ### DT-011 — MTTO: total/subtotal/IVA de Recepciones no se autocalcula
 **Registrada:** 2026-05-19 | **Dominio:** Backend — mantenimiento | **Severidad:** Media
 **Status:** Pendiente
