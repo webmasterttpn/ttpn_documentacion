@@ -87,6 +87,39 @@ narrativa financiera del taller atendiendo clientes externos.
 Servicio: `Mtto::WorkshopWeeklySummaryService`. Sin paginación
 (rango temporal pequeño).
 
+### `GET /mtto/work_orders/ops_kpis` (async — 202 + JobStatusChannel)
+
+KPIs operativos del taller para el Dashboard de Viabilidad. Sigue el
+estándar Python+async (ttpngas/CLAUDE.md):
+
+- Responde **`202 Accepted`** con `{ job_id, status: 'queued', range }`.
+- El job `Mtto::OpsKpisJob` ejecuta `scripts/mtto/workshop_ops_kpis.py`
+  vía `EjecutarScriptPythonJob` (Open3).
+- Al terminar hace broadcast a `job_status_#{user_id}` con
+  `{ type: 'job_done', job_id, kind: 'mtto_ops_kpis', data }`.
+- El FE filtra por `job_id` en `JobStatusChannel`. **Polling prohibido**.
+
+Params (default últimos 6 meses): `from` (ISO date), `to` (ISO date).
+
+Payload `data` del broadcast:
+
+```text
+{
+  "range": { "from", "to" },
+  "vehicles_per_week": { "2026-W18": 3, ... },
+  "top_services":         [{ service_id, service_name, count }],
+  "services_per_vehicle": [{ vehicle_id, label, services_count }],
+  "mechanics":            [{ mechanic_id, name, hours, ot_count, services_count }],
+  "top_overdue":          [{ work_order_id, work_order_number,
+                             vehicle_label, mechanic_name,
+                             estimated_minutes, actual_minutes,
+                             excess_minutes, excess_pct, completed_at }]
+}
+```
+
+Servicio: `scripts/mtto/workshop_ops_kpis.py` (Python). Detalles en
+`Documentacion/Backend/dominio/mantenimiento/services/WorkshopOpsKpisService.md`.
+
 ## Tiempo real
 
 Canal `MttoWorkOrdersChannel` → `stream_from "mtto_work_orders_#{bu_id}"`.
