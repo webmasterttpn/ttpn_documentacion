@@ -110,6 +110,13 @@ criterio que `travel_counts.hora`).
   está comentado → UTC).
 - **Frontend (escritura)**: `AsignationDialog.vue#onSubmit` envía la hora que el
   usuario eligió **tal cual** (string `YYYY-MM-DDTHH:mm`), sin `toISOString()`.
+- **Backend (normalización en escritura)**: `VehicleAsignationsController#normalized_asignation_params`
+  + `#to_wall_clock` normalizan `fecha_efectiva`/`fecha_hasta` ANTES de guardar.
+  Si el valor trae zona (ISO con "Z" u offset — p. ej. un FE viejo cacheado en el
+  PWA que todavía hace `toISOString`), se interpreta como instante UTC y se
+  convierte a la hora local del negocio; si es naive (FE nuevo) se guarda igual.
+  **Esto hace el fix robusto a la versión del FE**: no depende de redeploy ni de
+  limpiar el service worker. (Síntoma que evita: ID 9323, hora fin guardada +6 h.)
 - **Frontend (lectura)**: `date.formatDate` interpreta el string sin "Z" como
   hora local y la muestra verbatim.
 
