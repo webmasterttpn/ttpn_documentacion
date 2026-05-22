@@ -119,6 +119,30 @@ reconvirtiera a su zona local. Regresión cubierta en
 `spec/requests/api/v1/vehicle_asignations_spec.rb` (serialización sin zona +
 round-trip de POST con `Time.use_zone('UTC')`).
 
+### Escrituras "ahora" server-side — `VehicleAsignation.wall_clock_now`
+
+Cuando el servidor escribe un "ahora" (finalizar asignación, cierre automático
+de asignaciones previas) NO se usa `Time.current` (UTC), porque eso guardaría la
+hora en UTC y la lectura verbatim la mostraría +6 h adelante. Se usa
+`VehicleAsignation.wall_clock_now`, que toma la hora local del negocio
+(`America/Chihuahua`, UTC-6) y la construye como instante naive con esos dígitos.
+
+Aplica a:
+- `VehicleAsignationsController#finalize` (`fecha_hasta`).
+- `VehicleAsignation#finalize!`, `#active?`, scopes `active`/`inactive` y
+  `finalize_previous_asignations` (consistencia: guardar y comparar "ahora"
+  siempre en hora de pared).
+
+Cubierto por la regresión `POST .../finalize` con `travel_to(Time.utc(...))`.
+
+## Auditoría — `created_by_id` / `updated_by_id`
+
+`vehicle_asignations` incluye los campos de control `created_by_id` y
+`updated_by_id` (migración `20260522160000`). Se llenan **server-side** vía el
+concern `Auditable` desde `Current.user` (configurado en `BaseController`); son
+**transparentes para el FE** (no se envían en el payload ni se permiten en
+`vehicle_asignation_params`). Ver `app/models/concerns/auditable.rb`.
+
 ---
 
 ## Archivos relacionados
