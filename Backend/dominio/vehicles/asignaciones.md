@@ -97,6 +97,30 @@ Cuando se crea una nueva asignación desde el controller de asignaciones:
 
 ---
 
+## Zona horaria — `fecha_efectiva` / `fecha_hasta` son wall-clock
+
+`fecha_efectiva` y `fecha_hasta` son columnas `datetime` que el negocio maneja
+como **hora de pared (wall-clock)**, no como instante UTC a reconvertir (mismo
+criterio que `travel_counts.hora`).
+
+- **Backend (lectura)**: `VehicleAsignationsController#wall_clock` serializa
+  ambas con los dígitos crudos almacenados, **sin zona** (sin la "Z"), vía
+  `datetime&.utc&.strftime('%Y-%m-%dT%H:%M:%S')`. `.utc` normaliza a los dígitos
+  guardados sin importar el `Time.zone` del entorno (en prod `config.time_zone`
+  está comentado → UTC).
+- **Frontend (escritura)**: `AsignationDialog.vue#onSubmit` envía la hora que el
+  usuario eligió **tal cual** (string `YYYY-MM-DDTHH:mm`), sin `toISOString()`.
+- **Frontend (lectura)**: `date.formatDate` interpreta el string sin "Z" como
+  hora local y la muestra verbatim.
+
+**Síntoma que corrige**: la hora se veía desfasada en el FE (p. ej. −6 h) aunque
+en la tabla estaba correcta, porque el ISO con "Z" hacía que el navegador la
+reconvirtiera a su zona local. Regresión cubierta en
+`spec/requests/api/v1/vehicle_asignations_spec.rb` (serialización sin zona +
+round-trip de POST con `Time.use_zone('UTC')`).
+
+---
+
 ## Archivos relacionados
 
 - `app/models/vehicle_asignation.rb`
