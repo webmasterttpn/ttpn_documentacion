@@ -13,9 +13,13 @@ este módulo solo **organiza y reporta**.
 - **PNC** (Programado No Capturado) nace de un **TB**; **CNP** (Capturado No
   Programado) nace de un **TC**. NO son un selector: son inherentes a la tabla.
 - **VCPA** = `travel_counts.comentario = 'VCPA'` (capturado por administrativo).
-- Ventana de cuadre: `(fecha + hora) BETWEEN (fecha_ini + corte) AND
-  (fecha_fin + corte)`, `corte = KumiSetting.payroll_hora_corte` (default 01:30).
-  Por **chofer** la ventana usa `fecha_fin + 1 día`.
+- Ventana de cuadre **continua**: `(fecha + hora) BETWEEN (fecha_ini + hora_desde)
+  AND (fecha_fin + hora_hasta)`. `hora_desde`/`hora_hasta` (params
+  `hora_inicio`/`hora_fin`) definen los límites del día inicial y final; si no se
+  dan, usan el corte (`KumiSetting.payroll_hora_corte`, default 01:30). Ej. "del 7
+  a la 01:30 al 14 a la 01:30" = una sola ventana continua. **No** se agrega
+  `+1 día` (el usuario controla `fecha_fin`); planta y chofer usan la misma
+  ventana — la diferencia es el agrupamiento y que chofer excluye VCPA.
 - Filtro de vehículo operativo: `vehicles.clv LIKE 'T%'/'U%'/'A%'/'V%'`.
 - Semáforo (igual que el adaptador móvil): `capturados == programados` → verde;
   `<` → ámbar (faltan); `>` → rojo (exceso).
