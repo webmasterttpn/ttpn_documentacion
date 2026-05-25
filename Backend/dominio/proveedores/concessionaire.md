@@ -57,15 +57,23 @@ Un concesionario no debe duplicarse entre unidades de negocio. Métodos de clase
 
 1. Busca duplicado con `find_duplicate` (RFC → nombre).
 2. Si **existe en la unidad actual** → `422` `{ error: 'Ya existe este concesionario en tu unidad de negocio' }`.
-3. Si **existe en otra(s) unidad(es)** → `409` con:
-   ```json
-   { "code": "concessionaire_exists",
-     "message": "Ya existe el concesionario \"…\". Puedes asignarlo también a tu unidad de negocio.",
-     "concessionaire": { "id": …, "business_units": [...] } }
-   ```
+3. Si **existe en otra(s) unidad(es)** → `409` con cuerpo
+   `{ "code": "concessionaire_exists", "message": "Ya existe…", "concessionaire": { "id", "business_units" } }`.
    El FE muestra "ya existe en X, ¿asignarlo a esta unidad?" y, al confirmar,
    llama `assign_business_unit`.
 4. Si **no existe** → crea y liga la BU actual → `201`.
+
+### Asignación de varias unidades de negocio (solo super admin)
+
+- `concessionaire_params` permite `business_unit_ids: []` **solo si `current_user.sadmin?`**
+  (defensa en profundidad; hoy además el `Ability` exige sadmin para gestionar).
+- **Crear**: si el sadmin manda `business_unit_ids`, el concesionario queda ligado
+  a esas unidades. Si no manda ninguna, se liga por defecto a la unidad actual
+  (`ensure_default_business_unit`).
+- **Editar** (`PATCH`): `business_unit_ids` **reemplaza** la colección de unidades.
+  Un no-sadmin no puede modificarlas (se ignora el parámetro).
+- FE: el multi-select de unidades aparece solo para sadmin (`isSuperAdmin`); en
+  edición precarga las unidades actuales, en alta preselecciona la unidad activa.
 
 ## Frontend
 
