@@ -33,6 +33,7 @@ Documentacion/
 | [onboarding/](INFRA/onboarding/) | Guía de desarrollador, setup BE/FE, nueva app |
 | [operaciones/](INFRA/operaciones/) | Runbook de incidentes |
 | [database/](INFRA/database/) | ERD global (rails-erd), convenciones de esquema, migraciones críticas |
+| [Integraciones/](INFRA/Integraciones/) | Integraciones externas — Samsara (GPS/telemática): contexto, mapeo a Kumi e ideas |
 
 ---
 

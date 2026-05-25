@@ -1,8 +1,35 @@
-# Refactor Plan — DashboardPage.vue
+# DashboardPage.vue
 
-**Archivo actual:** `pages/Dashboard/DashboardPage.vue` — 1,473 líneas
-**Estado:** PENDIENTE DE EJECUTAR
-**Problema:** Todo en un solo archivo: lógica de período, carga async con polling, 5 gráficos, matriz expandible, exportación y estilos.
+**Archivo:** `pages/Dashboard/DashboardPage.vue` (orquestador) + `pages/Dashboard/tabs/*` + `components/KPIs/*` + `composables/Dashboard/*`.
+**Estado del refactor:** EJECUTADO (la estructura propuesta más abajo ya existe en el código).
+
+---
+
+## Comportamiento actual (2026-05-25)
+
+### Tabs por privilegio
+Cada tab del dashboard es un **privilegio independiente** (`module_key`): `dashboard_revenue`
+(Ingresos), `dashboard_ttpns` (TTPNs), `dashboard_taller` (Mantenimiento). El componente usa
+`usePrivileges('dashboard_revenue')`, etc., y oculta el tab si el rol no tiene **Acceso** (`v-if`).
+- En **gestión de privilegios** (Settings → Usuarios/Permisos) estos tres aparecen bajo el grupo
+  "General" y se les puede dar Acceso (= view) por separado. Requieren estar **sembrados** en la BD
+  (seed `db/seeds/privileges.rb`; si solo existe `dashboard`, faltan los tres tabs — sembrarlos).
+- **Fallback:** si un rol no tiene asignado **ningún** tab, se muestran todos (para no dejar el
+  dashboard en blanco). En cuanto se asigna al menos uno, se respeta la selección. Sadmin ve todos.
+
+### Carga perezosa ("nada hasta Generar")
+**No se carga nada al entrar** (se quitó `onMounted(onLoad)`). El usuario abre la página al instante
+y dispara la carga del tab que le interesa:
+- **Ingresos:** el panel de período queda visible con su botón **Consultar** (o el botón **Generar**
+  del header). Hasta entonces el tab muestra un estado vacío. `revenueLoaded` (en `DashboardPage`)
+  controla el estado vacío vía prop `:loaded` de `DashboardRevenueTab`.
+- **TTPNs:** ya era manual (botón **Consultar** propio, sin `onMounted`). Sin cambios.
+- **Mantenimiento (Taller):** los paneles `WorkshopOpsPanel`/`WorkshopWeeklyTab` auto-cargan al
+  montar y se comparten con Finanzas, así que **no se modifican**; el tab los **gatea** detrás de un
+  botón **Generar** (`generated` ref) — solo se montan (y cargan) al presionarlo.
+
+> Patrón general buscado: ninguna pantalla pesada debe auto-cargar todo al montar; cargar el
+> contenido del tab/sección activo bajo demanda. (Por ahora aplicado solo al Dashboard.)
 
 ---
 

@@ -8,7 +8,7 @@ Gestión de la flotilla de vehículos: unidades, documentos adjuntos (PDFs/imág
 
 | Modelo | Archivo | Descripción |
 | --- | --- | --- |
-| `Vehicle` | [model.md](model.md) | Unidad de flotilla. Filtro por BU via concessionaires |
+| `Vehicle` | [model.md](model.md) | Unidad de flotilla. Filtro por BU dueña (`business_unit_id`); visibilidad cross-BU de servicio vía `serviceable_business_units` |
 | `VehicleDocument` | [documents.md](documents.md) | Documentos adjuntos en S3. URL via `blob.url` |
 
 ---
@@ -22,7 +22,7 @@ vehicles/
 ├── documents.md            ← VehicleDocument
 ├── performance.md          ← Optimizaciones del endpoint
 ├── controller/
-│   └── (pendiente)
+│   └── endpoints.md        ← CRUD + serviceable / assign_serviceable
 └── stats/
     └── (pendiente)
 ```
