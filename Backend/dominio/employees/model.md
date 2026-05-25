@@ -95,9 +95,23 @@ Consulta `KumiSetting.vacation_days_for_year(business_unit_id, years)` con los a
 
 Retorna `avatar.url` (URL presignada de S3). Retorna `nil` si no hay avatar adjunto.
 
+> **Importante:** NO hace fallback a otro empleado. Antes el serializer caía al
+> avatar del empleado ID 1; cuando esa imagen del bucket se reemplazó por la foto
+> de una persona real, **todos los empleados sin avatar mostraban esa foto**. Se
+> eliminó el fallback: ahora devuelve `nil` y el **FE muestra `/ttpn_logo.png`**
+> (logo TTPN) por defecto. Al subir una foto real, ésta reemplaza al logo.
+
 ---
 
 ## Reglas de negocio críticas
+
+### Normalización de texto (trim)
+
+`before_validation :normalize_text_fields` limpia `nombre`, `apaterno`, `amaterno`,
+`direccion`, `ciudad`: colapsa runs de espacios internos a uno y recorta extremos
+(`value.gsub(/\s+/, ' ').strip`). Permite varios nombres separados por un solo
+espacio (p. ej. "JOSÉ LUIS MARÍA"). Aplica a alta y edición. La data histórica se
+limpió con un `UPDATE ... btrim(regexp_replace(col,'\s+',' ','g'))`.
 
 ### Estado activo/inactivo
 
