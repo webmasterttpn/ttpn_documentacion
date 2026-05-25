@@ -36,7 +36,11 @@ Catálogo de proveedores externos: gasolineras, talleres y concesionarias. Los m
 ```text
 app/controllers/api/v1/suppliers_controller.rb
 app/controllers/api/v1/gas_stations_controller.rb
+app/controllers/api/v1/concessionaires_controller.rb
 ```
+
+- `Concessionaire` (global, multi-BU + deduplicación al crear): ver
+  [`concessionaire.md`](concessionaire.md).
 
 ---
 

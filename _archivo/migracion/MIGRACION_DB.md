@@ -20,6 +20,186 @@ Railway (staging API)        Supabase (staging DB)
 - Los `db:migrate` se ejecutan automáticamente en Railway al hacer push
 - El riesgo real: agregar columnas con `NOT NULL` sin backfill previo → error en la migración
 
+> **Último backup probado:** `acfd4e22-9dc3-4293-ba33-db54650bc6ac` (Heroku,
+> 2026-05-24, `pg_custom`, 209 MB, 79 tablas, env `production`, migración tope
+> `20260128020918`). El procedimiento de cutover completo se **ensayó y validó de
+> punta a punta** con este backup el 2026-05-24 — ver la sección
+> **«ENSAYO DE CUTOVER VALIDADO»** más abajo.
+
+---
+
+## ENSAYO DE CUTOVER VALIDADO — 2026-05-24
+
+> Procedimiento **probado de punta a punta** restaurando el backup de producción
+> `acfd4e22…` sobre el esquema V2 actual, en una DB local paralela
+> (`ttpngas_cutover`) **sin tocar** `ttpngas_development`. Este es el guion exacto
+> del cutover de producción. Todos los pasos terminaron en **exit 0**.
+
+### Estado de la divergencia (al 2026-05-24)
+
+| | Producción (Heroku, backup) | Esquema V2 (dev / `transform_to_api`) |
+|---|---|---|
+| Migración tope | `20260128020918` (28-ene) | `20260522160000` (22-may) |
+| Migraciones | 160 | 245 |
+| Tablas | 79 | 111 |
+
+- **~85 migraciones** pendientes de aplicar sobre los datos de producción.
+- **+32 tablas nuevas** en V2 que prod no tiene: módulo `mtto_*` completo
+  (inventario/taller), `privileges` / `role_privileges`, `alert_*`,
+  `finance_concepts/entries/projects`, `kumi_settings`, `api_keys` / `api_users`,
+  `client_users`, `employee_appointment_attendees`, `payroll_logs`,
+  `vehicle_make_models` / `vehicle_makes` / `vehicle_document_types`.
+- **1 tabla solo en prod**: `client_contacts` (renombrada/eliminada en V2). Su
+  data se **omite** en el restore-data; confirmar que ningún proceso la use.
+
+### Procedimiento (reproducible)
+
+```bash
+DUMP=~/Downloads/acfd4e22-9dc3-4293-ba33-db54650bc6ac
+PSQL=/usr/local/opt/postgresql@17/bin/psql
+PGR=/usr/local/opt/postgresql@17/bin/pg_restore
+export PGPASSWORD='<local_db_psw>'
+
+# 1) DB nueva paralela + extensiones (NO toca la dev existente)
+$PSQL -h localhost -U castean -d postgres -c "CREATE DATABASE ttpngas_cutover OWNER castean;"
+$PSQL -h localhost -U castean -d ttpngas_cutover \
+  -c 'CREATE EXTENSION IF NOT EXISTS pgcrypto; CREATE EXTENSION IF NOT EXISTS "uuid-ossp";'
+
+# 2) Restaurar el dump de prod (esquema ene-28 + datos). ~42 s, exit 0, 0 errores
+$PGR --no-owner --no-acl --no-privileges -j 4 \
+  -h localhost -U castean -d ttpngas_cutover "$DUMP"
+
+# 3) Correr las migraciones V2 sobre los datos de prod — LA PRUEBA CLAVE.
+#    En el contenedor de la API, apuntando con DATABASE_URL a la DB nueva.
+#    ~2 min, exit 0: las 85 migraciones aplicaron limpias sobre datos reales.
+DBURL="postgres://castean:<pwd>@host.docker.internal:5432/ttpngas_cutover"
+docker exec -e DATABASE_URL="$DBURL" kumi_api bundle exec rails db:migrate
+#    (revertir db/schema.rb después — la corrida lo reescribe con pgcrypto/uuid-ossp)
+```
+
+### Backfills (después del migrate)
+
+Las columnas nuevas se agregan **nullable**; los renglones de prod quedan en
+NULL y hay que rellenarlos. Generar los UPDATE dinámicamente cubre **todas** las
+tablas con cada columna (no una lista fija):
+
+```bash
+# Genera un UPDATE idempotente por cada tabla que tenga la columna
+$PSQL -h localhost -U castean -d ttpngas_cutover -tAc "
+select string_agg(stmt, E'\n') from (
+  select format('UPDATE public.%I SET business_unit_id = 1 WHERE business_unit_id IS NULL;', table_name) stmt
+    from information_schema.columns where table_schema='public' and column_name='business_unit_id'
+  union all
+  select format('UPDATE public.%I SET created_by_id = :SADMIN WHERE created_by_id IS NULL;', table_name)
+    from information_schema.columns where table_schema='public' and column_name='created_by_id'
+  union all
+  select format('UPDATE public.%I SET updated_by_id = :SADMIN WHERE updated_by_id IS NULL;', table_name)
+    from information_schema.columns where table_schema='public' and column_name='updated_by_id'
+) s;" > /tmp/backfill.sql
+
+# Triggers OFF (session_replication_role) — sin esto, ttpn_bookings (1.6M) y
+# travel_counts (1.3M) tardan horas por los triggers sp_tctb_update/sp_tb_update.
+( echo "SET session_replication_role = replica;"; cat /tmp/backfill.sql; \
+  echo "SET session_replication_role = DEFAULT;" ) \
+  | $PSQL -h localhost -U castean -d ttpngas_cutover -v ON_ERROR_STOP=0
+# Duración real: ~12 min (≈9M updates de fila). Resultado: 0 NULLs restantes.
+```
+
+- **`:SADMIN`** = id de un usuario admin válido. ⚠️ `sadmin` ya **no es un id
+  fijo** (1 ni 2): es un **booleano por usuario** y puede haber varios. Para
+  filas históricas sin autor, usar cualquier `users.id` con `sadmin = true`
+  (en el ensayo del 24-may fue el id **2**). De aquí en adelante los controllers
+  asignan `created_by_id`/`updated_by_id` server-side, así que el backfill solo
+  cubre el histórico migrado.
+- `business_unit_id = 1` (TTPN) como default. Varias tablas ya traen BU asignado
+  por las migraciones; el backfill solo llena los NULL residuales. Las grandes
+  (`ttpn_bookings`, `travel_counts`, `discrepancies`, `gas_*`) sí van todas a 1.
+- `users.jti` y `roles.business_unit_id` quedaron en **0 NULLs** tras el migrate
+  (las migraciones los rellenan). jti verificado único (55/55).
+
+### Seeds de tablas nuevas (config que prod no tiene)
+
+```bash
+# Catálogo de privilegios (75 módulos) + KumiSettings por BU
+docker exec -e DATABASE_URL="$DBURL" kumi_api bundle exec rails runner '
+  load Rails.root.join("db/seeds/privileges.rb")
+  load Rails.root.join("db/seeds/04_role_privileges.rb")
+  BusinessUnit.find_each { |bu| KumiSetting.initialize_defaults(bu.id) }
+'
+```
+
+⚠️ **BUG a corregir antes del cutover** (`db/seeds/role_privileges_sistemas.rb:9`):
+busca el rol con `Role.find_by(nombre: 'Sistemas')` (mayúscula) y hace `exit 1`
+si no lo encuentra. En prod el rol es **`'sistemas'`** (minúscula) → el seed
+**aborta toda la cadena** (no asigna ningún rol ni los KumiSettings). Fix: lookup
+case-insensitive (`Role.find_by("nombre ILIKE ?", "sistemas")`) y **no** usar
+`exit 1` dentro de un seed encadenado. En el ensayo se corrió un equivalente
+corregido → resultado: **75 privileges, 196 role_privileges, 10 kumi_settings**.
+
+### Ajuste de TODAS las secuencias (obligatorio tras cargar datos)
+
+En vez de la lista fija (abajo), generar el `setval` de cada secuencia con dueño:
+
+```bash
+$PSQL -h localhost -U castean -d ttpngas_cutover -tAc "
+select string_agg(format(
+  'SELECT setval(%L, COALESCE((SELECT MAX(%I) FROM %I.%I),1), (SELECT MAX(%I) FROM %I.%I) IS NOT NULL);',
+  s_ns.nspname||'.'||s.relname, a.attname, t_ns.nspname, t.relname, a.attname, t_ns.nspname, t.relname), E'\n')
+from pg_class s
+join pg_depend d on d.objid=s.oid and d.deptype in ('a','i')
+join pg_class t on t.oid=d.refobjid
+join pg_attribute a on a.attrelid=t.oid and a.attnum=d.refobjsubid
+join pg_namespace s_ns on s_ns.oid=s.relnamespace
+join pg_namespace t_ns on t_ns.oid=t.relnamespace
+where s.relkind='S' and s_ns.nspname='public';" | $PSQL -h localhost -U castean -d ttpngas_cutover
+# Ensayo: 106 secuencias ajustadas, 0 errores.
+```
+
+### Verificación «nada se rompe» (resultado del ensayo)
+
+```bash
+docker exec -e DATABASE_URL="$DBURL" kumi_api bundle exec rails runner '
+  raise "pendientes" if ActiveRecord::Base.connection.migration_context.needs_migration?
+  TtpnBooking.includes(:client).first; TravelCount.first; Discrepancy.first
+  raise "sin jti" unless User.where.not(jti: nil).first
+  puts KumiSetting.payroll_hora_corte(1)   # dependencia de cuadre/nómina
+'
+```
+
+- `migration_context.needs_migration?` → **false** (todo al día).
+- Modelos + asociaciones OK; `business_unit_filter` OK; users con jti OK.
+- `KumiSetting.payroll_hora_corte(1)` → **01:30** (cuadre/nómina funciona).
+- Conteos finales: bookings **1 603 360**, travel_counts **1 298 572**,
+  discrepancies **158 198**, vehicles 392, employees 1327, users 55.
+
+### Checklist de findings para el cutover real (próxima semana)
+
+- [ ] **Fix** `role_privileges_sistemas.rb` (case-insensitive + sin `exit 1`).
+- [ ] `created_by_id`/`updated_by_id` → usar un `users.id` con `sadmin=true`
+      (no hardcodear 1; `sadmin` es booleano por usuario).
+- [ ] Confirmar que nada dependa de la tabla `client_contacts` (solo en prod).
+- [ ] Validar reparto real de `business_unit_id` (TTPN vs TULPE) si aplica; el
+      ensayo manda los NULL residuales a BU 1.
+- [ ] **Concesionarios → TTPN**: en prod los concesionarios operativos (los que
+  están ligados a vehículos activos) quedan vinculados solo a TULPE (BU 2), así
+  que un usuario TTPN no los ve (el scope `Concessionaire.by_current_business_unit`
+  filtra por BU y **no** hace bypass para sadmin). Replicar el link a TTPN sin
+  quitar el de TULPE (ensayo 2026-05-24: agregó 5 links en cutover — Gómez + 3 Ochoa + Acosta):
+
+```sql
+INSERT INTO business_units_concessionaires (business_unit_id, concessionaire_id)
+SELECT DISTINCT 1, cv.concessionaire_id
+FROM concessionaires_vehicles cv
+JOIN vehicles v ON v.id = cv.vehicle_id AND v.status = true
+WHERE NOT EXISTS (
+  SELECT 1 FROM business_units_concessionaires b
+  WHERE b.concessionaire_id = cv.concessionaire_id AND b.business_unit_id = 1
+);
+```
+
+- [ ] (Opcional) Smoke de los scripts Python (`cuadre`, `mtto`) apuntando
+      `DATABASE_URL` a la DB cargada.
+
 ---
 
 ## CÓMO GENERAR UN BACKUP DE HEROKU
@@ -98,6 +278,12 @@ No se necesita la conexión directa (port 5432/IPv4).
 ---
 
 ## RESTAURAR TABLAS ESPECÍFICAS DESDE BACKUP DE HEROKU
+
+> **Para un cutover completo** usar el procedimiento de la sección **«ENSAYO DE
+> CUTOVER VALIDADO»** (restore full + `db:migrate` + backfill + seeds + setval),
+> que ya no requiere renombrar columnas a mano porque las migraciones crean las
+> columnas nuevas. Lo de abajo es para **repoblación quirúrgica** de tablas
+> sueltas sobre un esquema que ya está al día.
 
 Para repoblar tablas que fueron purgadas (ttpn_bookings, travel_counts, etc.) sin
 borrar los catálogos que ya están llenos:
