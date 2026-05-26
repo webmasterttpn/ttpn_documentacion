@@ -111,6 +111,8 @@ Vehicle.joins(:serviceable_business_units)
 
 > El vehículo **sigue perteneciendo** a su BU dueña; `serviceable_business_units` solo **agrega** quién más lo puede atender. Ver `Documentacion/Backend/dominio/mantenimiento/acceso_taller_camiones.md`.
 
+**FE:** el form del vehículo (`ttpn-frontend/src/pages/Vehicles/components/VehicleForm.vue`) muestra —**solo a sadmin**— un multiselect "Unidades de negocio que pueden dar servicio" que escribe `serviceable_business_unit_ids` vía `PATCH /api/v1/vehicles/:id`. Las opciones vienen del catálogo de BUs (`useBusinessUnitsDropdown`). Para asignación masiva existe además `POST /vehicles/assign_serviceable` (ver endpoints.md), aún sin UI.
+
 ---
 
 ## Nested attributes

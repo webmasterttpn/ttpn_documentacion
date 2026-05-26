@@ -57,9 +57,17 @@ Asigna —o revoca con `remove=true`— una **BU de servicio** a un conjunto de 
 > `service_business_unit_id` se nombra distinto de `business_unit_id` a propósito: para un
 > sadmin, `business_unit_id` es el param que el `BaseController` usa como filtro de BU activa.
 
+## `GET /api/v1/vehicles/:id/capacity`
+
+Capacidad sugerida de pasajeros (según tipo de unidad por prefijo de CLV y tarifa vigente del
+cliente) + chofer asignado. La lógica vive en el query object `VehicleCapacityQuery`
+(`app/queries/vehicle_capacity_query.rb`); el controller solo valida `client_id`/`@vehicle` y delega.
+
 ## Archivos
 
 - `app/controllers/api/v1/vehicles_controller.rb`
+- `app/queries/vehicle_capacity_query.rb` — lógica de `capacity` (SQL + fallback por CLV + chofer asignado)
 - `app/serializers/vehicle_serializer.rb` (`serviceable_business_units` en la vista completa)
 - `config/routes/vehicles.rb`
+- FE: `ttpn-frontend/src/pages/Vehicles/components/VehicleForm.vue` (campo serviceable, solo sadmin)
 - Swagger: `spec/requests/api/v1/vehicles_spec.rb` → `swagger/v1/swagger.yaml`
