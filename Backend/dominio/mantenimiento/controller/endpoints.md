@@ -118,21 +118,20 @@ Respuesta:
         "counts_per_week": { "2026-W18": 3, ... },
         "products": [
           { "product_id", "name", "unit", "sale_price",
-            "per_week": { "2026-W18": { "qty", "cost", "avg_cost" }, ... } }
+            "per_week": { "2026-W18": { "qty", "cost", "avg_cost",
+                                        "sale_price", "revenue", "profit" }, ... } }
         ] }
     ]
   },
-  "external": { ...,
-    "per_week" extra de cada producto: { "qty", "cost", "avg_cost",
-                                          "sale_price", "revenue", "profit" }
-  }
+  "external": { ... mismo shape de producto por celda ... }
 }
 ```
 
 Filtra por `Current.business_unit`, solo OTs `status='completed'` con
-`completed_at` en el rango. La sección `external` agrega `revenue`
-(`qty × sale_price`) y `profit` (`revenue − cost`) por celda para la
-narrativa financiera del taller atendiendo clientes externos.
+`completed_at` en el rango. **Ambas** secciones agregan `revenue`
+(`qty × sale_price`) y `profit` (`revenue − cost`) por celda: en `external` es la
+ganancia real del taller; en `internal` es el **ahorro** vs. pagar precio público
+(valor a precio público − costo). `sale_price` 0 ⇒ ahorro negativo (= −costo).
 
 Servicio: `Mtto::WorkshopWeeklySummaryService`. Sin paginación
 (rango temporal pequeño).
