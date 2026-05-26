@@ -4,7 +4,7 @@
 
 Representa una unidad de la flotilla de TTPN (autobús, van, etc.). Pertenece a **una** BusinessUnit dueña (`business_unit_id`) y a una o más Concesionarias (dato comercial/administrativo). Soporta documentos adjuntos (licencias, permisos) con imágenes/PDFs en S3.
 
-> **Visibilidad (importante):** el listado de vehículos de cada BU se filtra **solo por `business_unit_id`** (la BU dueña). La concesionaria **ya no** otorga visibilidad cross-BU (ver "Scopes" e "Histórico: Regla B"). Para que una BU de servicio (taller, autolavado, hojalatería) atienda flota de otra BU se usa la relación dedicada `serviceable_business_units`.
+> **Visibilidad (importante):** el listado de cada BU muestra los vehículos de su **BU dueña** (`business_unit_id`) **y** los que el sadmin le **prestó** (`operable_business_units`). La concesionaria **ya no** otorga visibilidad cross-BU (ver "Scopes" e "Histórico: Regla B"). El **servicio** cross-BU (taller/autolavado/hojalatería) usa la relación dedicada `serviceable_business_units` (no entra al listado de flotilla).
 
 ---
 
@@ -21,7 +21,7 @@ Representa una unidad de la flotilla de TTPN (autobús, van, etc.). Pertenece a 
 | `serie`       | string  | Número de serie.                                                  |
 | `app_version` | string  | Versión de la app instalada en la unidad (si aplica).             |
 | `vehicle_type_id` | integer | FK a `VehicleType`. Tipo de unidad.                          |
-| `business_unit_id` | integer | FK a `BusinessUnit`. **BU dueña.** Único criterio del listado (`business_unit_filter`). Se auto-asigna al crear desde `Current.business_unit` (`BusinessUnitAssignable`). |
+| `business_unit_id` | integer | FK a `BusinessUnit`. **BU dueña.** Criterio base del listado (`business_unit_filter` = dueña O operable). Se auto-asigna al crear desde `Current.business_unit` (`BusinessUnitAssignable`). |
 
 ---
 
@@ -41,7 +41,8 @@ Representa una unidad de la flotilla de TTPN (autobús, van, etc.). Pertenece a 
 |----------------------|---------------------------|----------------------------------------------------------|
 | `vehicle_type`       | `belongs_to`              |                                                          |
 | `concessionaires`    | `has_and_belongs_to_many` | Tabla join `concessionaires_vehicles`. Dato comercial; **no** afecta visibilidad. |
-| `serviceable_business_units` | `has_and_belongs_to_many` | BUs que pueden **atender/dar servicio** al vehículo además de su BU dueña. Tabla join `vehicle_serviceable_business_units`. Clase `BusinessUnit`. Inverso: `BusinessUnit#serviceable_vehicles`. |
+| `serviceable_business_units` | `has_and_belongs_to_many` | OTRAS BUs que pueden **dar servicio** al vehículo (taller/autolavado). Inicia vacío. Tabla join `vehicle_serviceable_business_units`. Inverso: `BusinessUnit#serviceable_vehicles`. **No** entra a `business_unit_filter`. |
+| `operable_business_units` | `has_and_belongs_to_many` | OTRAS BUs que pueden **operar** el vehículo (préstamo). Inicia vacío; solo sadmin. Tabla join `vehicle_operable_business_units`. Inverso: `BusinessUnit#operable_vehicles`. **Sí** entra a `business_unit_filter` (aparece en su flotilla). |
 | `vehicle_documents`  | `has_many`                | Documentos de la unidad. `dependent: :destroy`.          |
 | `gas_charges`        | `has_many`                | Cargas de combustible.                                   |
 | `vehicle_check`      | `has_one`                 | Checklist de revisión.                                   |
@@ -60,14 +61,17 @@ Representa una unidad de la flotilla de TTPN (autobús, van, etc.). Pertenece a 
 
 ### `business_unit_filter`
 
-Filtra **solo** por la BU dueña (`business_unit_id`):
+Filtra por la BU **dueña** (`business_unit_id`) **O** las BUs que pueden **operar** el vehículo (`operable_business_units`, préstamo cross-BU):
 
 ```ruby
 scope :business_unit_filter, lambda {
   return all if Current.user&.sadmin? && Current.business_unit.nil?
   return none unless Current.business_unit
 
-  where(business_unit_id: Current.business_unit.id)
+  bu_id = Current.business_unit.id
+  operable_ids = Vehicle.joins(:operable_business_units)
+    .where(business_units: { id: bu_id }).select(:id)
+  where(business_unit_id: bu_id).or(where(id: operable_ids)).distinct
 }
 ```
 
@@ -75,7 +79,7 @@ scope :business_unit_filter, lambda {
 - Super admin **con BU activa** respeta el mismo filtro que cualquier usuario.
 - Sin BU activa (non-sadmin sin BU): retorna `none`.
 
-> Igual que `Employee.business_unit_filter`: cada vehículo se ve únicamente en su BU dueña.
+> Un vehículo aparece en su BU dueña y en las BUs a las que el sadmin lo **prestó** (`operable_business_units`). Es el **mismo registro** (mismo `id`): no se duplica ni se parte el historial. El **servicio** (`serviceable_business_units`) NO entra en este filtro.
 
 #### Histórico: "Regla B" (eliminada — 2026-05-25)
 
@@ -91,27 +95,45 @@ Activos primero, luego inactivos. Dentro de cada grupo, orden por `clv`.
 
 ---
 
-## Visibilidad cross-BU de servicio (`serviceable_business_units`)
+## Relaciones cross-BU: servicio vs. operación
 
-Relación **dedicada** (HABTM, tabla `vehicle_serviceable_business_units`) que indica **qué BUs pueden atender / dar servicio** a un vehículo, además de su BU dueña. Habilita que una BU de servicio (taller de camiones, autolavado, hojalatería) vea y opere flota de otras BUs **sin** alterar `business_unit_filter` (que sigue siendo solo por BU dueña) y **sin** acoplar el concepto a "concesionario".
+Dos relaciones **dedicadas** (HABTM), ambas inician **vacías** (solo las gestiona el **sadmin**); son
+el reemplazo explícito de la vieja "regla B" por concesionario. La **BU dueña no se auto-agrega** a
+ninguna de las dos:
 
-- **Auto-fill al crear:** el callback `after_create :ensure_owner_business_unit_serviceable` agrega la BU donde se da de alta el vehículo (`business_unit_id`, tomada de `Current.business_unit`) a la lista. Idempotente (no duplica) y no-op si el vehículo se crea sin BU.
-- **Backfill inicial (migración `20260525000001`):** cada vehículo existente quedó atendible por su BU dueña (`COALESCE(business_unit_id, 1)` — toda la data actual es BU 1).
-- **Índice único** `(vehicle_id, business_unit_id)` (`idx_vehicle_serviceable_bu_unique`) garantiza idempotencia a nivel BD.
-- **Uso previsto:** el flujo de servicio (p. ej. picker de vehículo de una OT de mantenimiento de la BU taller) consulta los vehículos donde la BU activa está en `serviceable_business_units`, en vez de `business_unit_filter`. La OT (`Mtto::WorkOrder`) ya acepta `vehicle_id` de cualquier BU.
+| Relación | Tabla join | Qué habilita | ¿Entra a `business_unit_filter`? |
+| --- | --- | --- | --- |
+| `serviceable_business_units` | `vehicle_serviceable_business_units` | Otras BUs **dan servicio** (taller/autolavado/hojalatería) | **No** — solo el endpoint `serviceable` |
+| `operable_business_units` | `vehicle_operable_business_units` | Otras BUs **operan** el vehículo (préstamo: asignar chofer, usarlo en viajes) | **Sí** — aparece en su flotilla |
+
+En ambas el vehículo **sigue siendo el mismo registro** (mismo `id`, misma BU dueña): no se duplica
+ni se parte el historial. Índice único `(vehicle_id, business_unit_id)` en cada tabla.
+
+### `serviceable_business_units` (servicio)
+- Inicia vacío; guarda solo las **otras** BU que dan servicio (la dueña NO se agrega).
+- El endpoint `GET /vehicles/serviceable` devuelve **BU dueña O serviceable** (así la propia BU sigue
+  viendo sus vehículos en el picker aunque serviceable esté vacío). La OT (`Mtto::WorkOrder`) acepta
+  `vehicle_id` de cualquier BU. Ver `Documentacion/Backend/dominio/mantenimiento/acceso_taller_camiones.md`.
 
 ```ruby
-# Agregar una BU de servicio a un vehículo
-vehiculo.serviceable_business_units << bu_taller
-
-# Vehículos que la BU activa puede atender (dueña + concedidos)
-Vehicle.joins(:serviceable_business_units)
-       .where(business_units: { id: Current.business_unit.id })
+vehiculo.serviceable_business_units << bu_taller   # otra BU que da servicio
 ```
 
-> El vehículo **sigue perteneciendo** a su BU dueña; `serviceable_business_units` solo **agrega** quién más lo puede atender. Ver `Documentacion/Backend/dominio/mantenimiento/acceso_taller_camiones.md`.
+### `operable_business_units` (préstamo / operación)
+- Inicia vacío; el sadmin agrega las BU a las que se **presta** el vehículo.
+- `business_unit_filter` = `where(business_unit_id: bu).or(where(id: <operables por bu>))` → el vehículo
+  aparece en la **flotilla** de esas BU y lo pueden operar (mismo `id`, sin perder historial).
 
-**FE:** el form del vehículo (`ttpn-frontend/src/pages/Vehicles/components/VehicleForm.vue`) muestra —**solo a sadmin**— un multiselect "Unidades de negocio que pueden dar servicio" que escribe `serviceable_business_unit_ids` vía `PATCH /api/v1/vehicles/:id`. Las opciones vienen del catálogo de BUs (`useBusinessUnitsDropdown`). Para asignación masiva existe además `POST /vehicles/assign_serviceable` (ver endpoints.md), aún sin UI.
+```ruby
+vehiculo.operable_business_units << bu_prestada    # otra BU que puede operar el vehículo
+```
+
+**FE:** el form (`ttpn-frontend/src/pages/Vehicles/components/VehicleForm.vue`) muestra —**solo a
+sadmin**— dos multiselect: "Unidades de negocio que pueden dar servicio" (`serviceable_business_unit_ids`)
+y "Unidades de negocio que pueden operar (préstamo)" (`operable_business_unit_ids`), ambos vía
+`PATCH /api/v1/vehicles/:id`. Opciones del catálogo de BUs (`useBusinessUnitsDropdown`).
+`business_unit_id` (BU dueña) **no** se muestra ni se manda: lo asigna el controller desde la BU del
+usuario que crea/clona.
 
 ---
 
@@ -130,9 +152,12 @@ El `clv` se usa como slug. Para buscar un vehículo: `Vehicle.friendly.find(clv_
 ## Archivos relacionados
 
 - `app/models/vehicle.rb`
-- `app/models/business_unit.rb` — inverso `serviceable_vehicles`
+- `app/models/business_unit.rb` — inversos `serviceable_vehicles`, `operable_vehicles`
 - `app/models/vehicle_document.rb`
 - `app/serializers/vehicle_serializer.rb`
 - `app/controllers/api/v1/vehicles_controller.rb`
+- `app/controllers/concerns/vehicle_serviceable_actions.rb` — endpoints serviceable / assign_serviceable
 - `app/controllers/concerns/vehicle_stats_calculable.rb`
 - `db/migrate/20260525000001_create_vehicle_serviceable_business_units.rb`
+- `db/migrate/20260526000001_create_vehicle_operable_business_units.rb`
+- FE: `ttpn-frontend/src/pages/Vehicles/components/VehicleForm.vue` (campos serviceable/operable, solo sadmin)

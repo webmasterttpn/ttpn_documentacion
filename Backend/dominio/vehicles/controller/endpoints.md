@@ -7,22 +7,25 @@ estándar respeta la BU dueña (`Vehicle.business_unit_filter`, solo `business_u
 
 | Método | Ruta | Notas |
 | --- | --- | --- |
-| GET | `/api/v1/vehicles` | Lista por BU dueña. `?search=` (clv/placa, ILIKE). Cacheado por BU. |
-| GET | `/api/v1/vehicles/:id` | Detalle (slug FriendlyId). Incluye `serviceable_business_units`. |
-| POST | `/api/v1/vehicles` | Crea. Auto-asigna `business_unit_id` de la BU activa. |
-| PATCH/PUT | `/api/v1/vehicles/:id` | Actualiza. `serviceable_business_unit_ids: []` **solo permitido a sadmin**. |
+| GET | `/api/v1/vehicles` | Lista por `business_unit_filter` = BU dueña **O** operable. `?search=` (clv/placa, ILIKE). Cacheado por BU. |
+| GET | `/api/v1/vehicles/:id` | Detalle (slug FriendlyId). Incluye `serviceable_business_units` y `operable_business_units`. |
+| POST | `/api/v1/vehicles` | Crea. Auto-asigna `business_unit_id` de la BU del usuario (no se manda ni se ve). |
+| PATCH/PUT | `/api/v1/vehicles/:id` | Actualiza. `serviceable_business_unit_ids` y `operable_business_unit_ids` **solo permitidos a sadmin**. |
 | DELETE | `/api/v1/vehicles/:id` | Elimina. |
 | GET | `/api/v1/vehicles/:id/capacity` | Capacidad sugerida para auto-crear pasajeros. |
 
-## Visibilidad cross-BU de servicio
+## Visibilidad cross-BU: servicio (serviceable) vs. operación (operable)
 
-Ver el modelo [model.md](../model.md) (relación `serviceable_business_units`, regla B eliminada).
+Ver el modelo [model.md](../model.md). Dos relaciones dedicadas, ambas inician vacías y solo las
+gestiona el sadmin (reemplazo explícito de la regla B):
+- **operable** (préstamo: operar el vehículo) → entra a `business_unit_filter` (aparece en la flotilla).
+- **serviceable** (dar servicio) → NO entra a `business_unit_filter`; solo al endpoint de abajo.
 
 ### `GET /api/v1/vehicles/serviceable`
 
-Vehículos que la **BU activa puede ATENDER**: su BU dueña + los concedidos vía
-`serviceable_business_units`. Para el **picker de OT** de una BU de servicio (taller de
-camiones / autolavado / hojalatería) que opera flota de otras BU. **No** usa
+Vehículos que la **BU activa puede ATENDER**: su BU dueña **O** los concedidos vía
+`serviceable_business_units` (la BU dueña ya no se auto-agrega; el endpoint la incluye explícito).
+Para el **picker de OT** de una BU de servicio (taller / autolavado / hojalatería). **No** usa
 `business_unit_filter`.
 
 | Param (query) | Tipo | Descripción |
@@ -69,5 +72,5 @@ cliente) + chofer asignado. La lógica vive en el query object `VehicleCapacityQ
 - `app/queries/vehicle_capacity_query.rb` — lógica de `capacity` (SQL + fallback por CLV + chofer asignado)
 - `app/serializers/vehicle_serializer.rb` (`serviceable_business_units` en la vista completa)
 - `config/routes/vehicles.rb`
-- FE: `ttpn-frontend/src/pages/Vehicles/components/VehicleForm.vue` (campo serviceable, solo sadmin)
+- FE: `ttpn-frontend/src/pages/Vehicles/components/VehicleForm.vue` (campos serviceable y operable, solo sadmin)
 - Swagger: `spec/requests/api/v1/vehicles_spec.rb` → `swagger/v1/swagger.yaml`
