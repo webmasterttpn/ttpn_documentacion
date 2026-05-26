@@ -81,6 +81,9 @@ campos base de la OT incluye:
     { "id", "product", "unit_of_measure",
       "quantity_transferred", "unit_cost_charged", "line_cost" }
   ],
+  "transfers": [                             # TODAS las salidas vinculadas (cualquier estado)
+    { "id", "transfer_number", "status", "items_count", "total_cost" }
+  ],
   "materials_cost":        0.0,              # Σ line_cost (costo interno a costo promedio)
   "internal_market_value": 0.0,             # valor de mercado de los servicios
   "estimated_savings":     0.0              # ahorro estimado vs. cotización externa
