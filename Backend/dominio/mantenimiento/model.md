@@ -145,7 +145,8 @@ OT cancelada.
 Salida. `transfer_type` ∈ {`departmental`, `work_order`} (requiere
 `work_order_id` si es `work_order`). Folio `OUT-YYYY-NNN`. Las líneas registran
 `quantity_consumed_recovered`, `quantity_consumed_average`,
-`quantity_residue_returned`, `unit_cost_charged`, `line_cost`.
+`quantity_residue_returned`, `quantity_scrapped`, `unit_cost_charged`,
+`line_cost`.
 
 **Estados**: `enum :status` con valores
 `draft|pending_approval|approved|completed|cancelled`. Una salida es
@@ -164,10 +165,19 @@ del precio promedio). Cuando una línea consume capas mezcladas
 efectivo de la línea; para ese caso usar `effective_unit_cost = line_cost /
 quantity_transferred` (método del modelo, también expuesto en el serializer).
 
-**Validación residue ≤ consumido**: `quantity_residue_returned` no puede
-exceder `quantity_approved` (o `quantity_requested` si no hay aprobado).
-Sin este tope, el bucket `quantity_recovered` podía inflarse y crear
-inventario gratis.
+**Residuo vs. scrap (conciliación al cerrar OT)**: `quantity_residue_returned`
+= sobrante reutilizable (vuelve al bucket `quantity_recovered` a $0);
+`quantity_scrapped` = sobrante no recuperable (contaminado/merma — solo se
+registra, no cambia stock ni `average_cost`). `quantity_used = transferido −
+residuo − scrap`. Ambos se concilian al cerrar la OT vía
+`Mtto::ReconcileMaterialsService` (`POST /work_orders/:id/complete`). Detalle en
+`costeo_liquidos.md` y `services/ReconcileMaterialsService.md`.
+
+**Validación sobrante ≤ consumido**: `quantity_residue_returned +
+quantity_scrapped` no puede exceder lo transferido (o `quantity_approved` /
+`quantity_requested` antes de procesar). Sin este tope, el bucket
+`quantity_recovered` podía inflarse y crear inventario gratis o registrar merma
+mayor al material que salió.
 
 ## Concurrencia y append-only
 

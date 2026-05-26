@@ -36,6 +36,29 @@ hundido). Nunca se revalúa ni se recalcula el promedio por un retorno.
   `cost_layer = 'recovered'`. **No** toca `average_cost`. **No** hay costo de
   retorno.
 
+## Residuo recuperable vs. SCRAP (sobrante no recuperable)
+
+Tras consumir un líquido, parte del sobrante puede **reutilizarse** y parte
+puede haberse **contaminado o perdido**. La conciliación al **cerrar la OT**
+(`Mtto::ReconcileMaterialsService`, vía `POST /work_orders/:id/complete`) separa
+ambos por línea de salida:
+
+| Concepto | Campo | Efecto en inventario | Efecto en costo |
+|---|---|---|---|
+| **Residuo** (reutilizable) | `quantity_residue_returned` | `quantity_recovered += residuo` a $0 + movimiento `residue_return` | ninguno (ya estaba hundido) — aparece como ahorro al reusarse |
+| **Scrap** (contaminado / no recuperable) | `quantity_scrapped` | **ninguno** — el material ya salió del almacén y no vuelve | **ninguno** — el costo ya se hundió en la OT que lo consumió |
+
+- Regla de oro: **si el líquido se contaminó, es scrap/desperdicio, no residuo.**
+  El scrap **no** regresa al bucket recuperado (no se puede reusar) y **no**
+  descuenta stock a costo promedio (el material ya salió en la salida; su costo
+  ya está cargado a la OT). Solo se **registra** en `quantity_scrapped` para
+  reportes de gasto variable y merma.
+- Restricción de integridad (`Mtto::InventoryTransferItem`):
+  `quantity_residue_returned + quantity_scrapped <= quantity_transferred`
+  (lo conciliado no puede exceder lo consumido).
+- Cantidad realmente aprovechada: `quantity_used = transferido − residuo −
+  scrap` (método del modelo).
+
 ## Lado CONTABILIDAD / COSTOS
 
 - `line_cost = quantity_consumed_average · average_cost +

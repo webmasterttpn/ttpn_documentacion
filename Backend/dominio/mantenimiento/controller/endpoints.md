@@ -40,10 +40,30 @@ No encontrado: `{ error: ... }` (404). Sin token: 401.
 | `POST /mtto/work_orders/:id/start` | id. | activated/paused → in_progress |
 | `POST /mtto/work_orders/:id/pause` | id. | in_progress → paused |
 | `POST /mtto/work_orders/:id/resume` | id. | paused → in_progress |
-| `POST /mtto/work_orders/:id/complete` | id. | → completed (calcula `actual_minutes`) |
+| `POST /mtto/work_orders/:id/complete` | `ReconcileMaterialsService` + id. | concilia residuo/scrap + → completed (`actual_minutes`) |
 | `POST /mtto/work_orders/:id/cancel` | id. | → cancelled |
 
 Transición/recepción/salida inválida → 422 `{ error: ... }`.
+
+### `POST /mtto/work_orders/:id/complete` con conciliación de residuo/scrap
+
+Acepta un body **opcional** `reconciliation` para conciliar el material
+consumido al cerrar la OT (residuo recuperable vs. scrap no recuperable):
+
+```text
+{ "reconciliation": [
+    { "transfer_item_id": 12, "residue": 3.0, "scrap": 2.0 }, ...
+] }
+```
+
+- Corre `Mtto::ReconcileMaterialsService` (residuo → `quantity_recovered` $0 +
+  movimiento `residue_return`; scrap → solo `quantity_scrapped`, no cambia
+  stock) y luego la transición `complete`.
+- Sin `reconciliation`: cierra con residuo/scrap = 0 (comportamiento previo).
+- Errores → 422: línea ajena a la OT (`InvalidLine`), residuo + scrap mayor a lo
+  consumido (`RecordInvalid`), o transición inválida.
+
+Ver `services/ReconcileMaterialsService.md` y `costeo_liquidos.md`.
 
 ### `GET /mtto/work_orders/:id` (detalle, solo lectura)
 
