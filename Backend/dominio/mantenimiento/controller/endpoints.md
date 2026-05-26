@@ -45,6 +45,33 @@ No encontrado: `{ error: ... }` (404). Sin token: 401.
 
 Transición/recepción/salida inválida → 422 `{ error: ... }`.
 
+### `GET /mtto/work_orders/:id` (detalle, solo lectura)
+
+`show(detailed: true)` para el diálogo "Ver detalle de OT" del FE. Además de los
+campos base de la OT incluye:
+
+```text
+{
+  ...campos base de la OT...,
+  "vehicle": "CLV-001",                      # clv del vehículo (nil si externa)
+  "services": [
+    { "id", "service_id", "service", "estimated_time_minutes", "completed" }
+  ],
+  "materials": [                             # items de inventory_transfers.completed
+    { "id", "product", "unit_of_measure",
+      "quantity_transferred", "unit_cost_charged", "line_cost" }
+  ],
+  "materials_cost":        0.0,              # Σ line_cost (costo interno a costo promedio)
+  "internal_market_value": 0.0,             # valor de mercado de los servicios
+  "estimated_savings":     0.0              # ahorro estimado vs. cotización externa
+}
+```
+
+Solo lectura: el detalle no permite agregar/quitar servicios a una OT iniciada
+(decisión de diseño). `materials` proviene de las salidas de inventario
+completadas asociadas a la OT; los totales de costo son métodos del modelo
+`Mtto::WorkOrder` (`materials_cost`, `internal_market_value`, `estimated_savings`).
+
 ### `GET /mtto/work_orders/weekly_summary`
 
 Resumen semanal de OT completadas para la vista de viabilidad
