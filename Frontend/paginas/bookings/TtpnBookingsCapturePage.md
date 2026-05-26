@@ -12,6 +12,25 @@ La lógica fue distribuida en 2 composables y 6 componentes específicos de pág
 
 ---
 
+## Vista de calendario (2026-05-26)
+
+La pantalla tiene un **toggle lista ↔ calendario** (botón `view_list` / `calendar_month` en el header).
+En modo calendario monta el `CalendarLayout` **compartido** (`src/components/calendar/`) con
+`:max-per-group="3"`.
+
+- **Datos:** composable `useBookingCalendar.js` — reusa `GET /api/v1/ttpn_bookings` por rango de fechas
+  (según día/semana/mes) y mapea cada booking a un evento:
+  - `title` = **CLV** del vehículo (`'Sin unidad'` si no hay), `subtitle` = **chofer · cliente**.
+  - `group` = dirección (`ttpn_service_type.nombre`: 'Entrada' / 'Salida') → controla el overflow "+N".
+  - `color` = estado de cuadre + dirección: **verde** programado / **naranja** pendiente (fecha pasada
+    sin cuadrar) / **gris** cuadrado (`viaje_encontrado`); **las salidas usan el tono más oscuro**.
+- **Overflow 3 por dirección:** por horario, hasta 3 entradas + 3 salidas; cada grupo con su "+N"
+  (popover con todas; clic → detalle). Ver `COMPONENTES_CALENDARIO.md`.
+- **Clic en evento** → `viewBooking` → `BookingCaptureDetailDialog` (solo lectura), sin salir del calendario.
+- No toca el backend (el index ya filtra por `fecha_inicio`/`fecha_fin` y devuelve clv/chofer/cliente/tipo).
+
+---
+
 ## Archivos creados
 
 ### Composables — `src/composables/TtpnBookingsCapture/`

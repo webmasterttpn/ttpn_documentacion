@@ -1,6 +1,33 @@
 # 📅 CALENDARIO DE CITAS - COMPONENTES COMPLETOS
 
-## ✅ YA CREADO:
+> ⚠️ **Lo de abajo es un scaffolding histórico** (CalendarHeader/AppointmentCard/etc.). El calendario
+> real vive en `src/components/calendar/` y es **compartido** por EmployeeAppointments,
+> DriverRequests y Captura de Servicios (ttpn_bookings). Ver "Estado actual".
+
+## Estado actual (componentes compartidos — `src/components/calendar/`)
+
+- **`CalendarLayout.vue`** — wrapper: sidebar con toggle Día/Semana/Mes + `CalendarMiniCalendar` +
+  slot `#sidebar-filters`; en el área principal monta `CalendarDayView/WeekView/MonthView`.
+- **Props:** `date` (Date), `view` ('day'|'week'|'month'), `events` (Array), `markedDates`
+  (['YYYY-MM-DD']), `loading` (Boolean), **`maxPerGroup`** (Number, default null).
+- **Emits:** `update:date`, `update:view`, `click-event` (devuelve `ev._raw`), `click-time`,
+  `create-appointment`, `click-day`.
+- **CalendarEvent:** `{ id, date:'YYYY-MM-DD', startTime:'HH:MM', endTime|null, color, title, subtitle,
+  _raw, group? }`. `group` (opcional) = clave de agrupación para el overflow (p. ej. 'Entrada'/'Salida').
+
+### Overflow "+N" (agrupado) — `maxPerGroup`
+Helper `src/components/calendar/calendarOverflow.js` (`groupEvents`). Comportamiento:
+- **Sin `maxPerGroup`** (Citas, Solicitudes): comportamiento **heredado** sin cambios — Día/Semana
+  posicionan eventos absolutos por minuto; Mes muestra 3 por día. (El `+N más` de Mes ahora es un
+  popover clickable.)
+- **Con `maxPerGroup`** (Captura de Servicios, =3): cada horario/día **agrupa por `ev.group`** y muestra
+  hasta N por grupo; el resto va a un chip **"+N {grupo}"** con un `q-menu` (popover) que lista TODOS los
+  del grupo; al hacer clic en uno se emite `click-event` (la página abre el detalle) **sin cerrar el
+  calendario**. Día usa una lista por hora; Semana apila chips por celda; Mes agrupa por día.
+
+---
+
+## ✅ YA CREADO (histórico):
 
 - Backend completo (Controller, Serializer, Rutas)
 - Migración ejecutada
