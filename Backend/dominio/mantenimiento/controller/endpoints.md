@@ -167,6 +167,37 @@ Payload `data` del broadcast:
 Servicio: `scripts/mtto/workshop_ops_kpis.py` (Python). Detalles en
 `Documentacion/Backend/dominio/mantenimiento/services/WorkshopOpsKpisService.md`.
 
+### `GET /mtto/work_orders/variable_costs` (async — 202 + JobStatusChannel)
+
+Gasto variable del taller para el panel "Gasto variable" del Dashboard de
+Mantenimiento (tab Taller). Mismo estándar Python+async que `ops_kpis`:
+
+- Responde **`202 Accepted`** con `{ job_id, status: 'queued', range }`.
+- El job `Mtto::VariableCostsJob` ejecuta `scripts/mtto/workshop_variable_costs.py`
+  vía `EjecutarScriptPythonJob`.
+- Broadcast a `job_status_#{user_id}` con
+  `{ type: 'job_done', job_id, kind: 'mtto_variable_costs', data }`.
+
+Params (default últimos 6 meses): `from` (ISO date), `to` (ISO date).
+
+Payload `data` del broadcast:
+
+```text
+{
+  "range": { "from", "to" },
+  "spend_by_category":    [{ category_id, category, amount, quantity, scrap_qty, scrap_cost }],
+  "internal_vs_external": { material_cost, parts_market_value, labor_external_value,
+                            external_value, savings },
+  "external_jobs":        { parts_revenue, labor_revenue, revenue, cost, profit },
+  "totals":               { material_spend, scrap_cost, internal_savings,
+                            external_profit, total_benefit,
+                            internal_ot_count, external_ot_count }
+}
+```
+
+Servicio: `scripts/mtto/workshop_variable_costs.py` (Python). Detalles y fórmulas
+en `services/WorkshopVariableCostsService.md`.
+
 ## Tiempo real
 
 Canal `MttoWorkOrdersChannel` → `stream_from "mtto_work_orders_#{bu_id}"`.

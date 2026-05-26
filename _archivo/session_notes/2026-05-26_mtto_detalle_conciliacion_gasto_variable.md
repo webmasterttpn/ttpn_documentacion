@@ -47,13 +47,28 @@ scrap/desperdicio, no residuo**.
 - Docs: `costeo_liquidos.md` (residuo vs. scrap), `model.md`,
   `services/ReconcileMaterialsService.md`, `controller/endpoints.md`.
 
-## Fase 3 — Dashboard: panel "Gasto variable" (Python async) ⏳
+## Fase 3 — Dashboard: panel "Gasto variable" (Python async) ✅
 
-Pendiente: script `scripts/mtto/workshop_variable_costs.py` (gasto por
-categoría, costo externo vs interno/ahorro, ingreso vs utilizado externo,
-ahorro/profit total) + `Mtto::VariableCostsJob` + endpoint
-`GET /work_orders/variable_costs` (202) + FE `useWorkshopVariableCosts.js` +
-`WorkshopCostsPanel.vue` en `DashboardTallerTab.vue`.
+**Problema**: el dashboard de Mantenimiento no mostraba gasto variable (gasto por
+categoría en monto+cantidad, costo externo vs interno, ingreso vs utilizado,
+comparativas de ahorro).
+
+- **BE** `scripts/mtto/workshop_variable_costs.py` (SQL puro, 4 secciones):
+  `spend_by_category` (monto + cantidad + merma/scrap por categoría),
+  `internal_vs_external` (costo interno a costo promedio vs valor externo
+  partes@sale_price + mano de obra@external_rate → ahorro), `external_jobs`
+  (ingreso vs costo → profit en OT externas), `totals` (ahorro interno + profit
+  externo = beneficio total). Espejo de `workshop_ops_kpis.py`.
+- `Mtto::VariableCostsJob` (kind `mtto_variable_costs`) + endpoint
+  `GET /work_orders/variable_costs` (202 + JobStatusChannel) + ruta.
+- **FE**: `useWorkshopVariableCosts.js` (espejo de ops) + `WorkshopCostsPanel.vue`
+  (tarjetas resumen, gasto por categoría con bar chart + tabla, comparativas
+  interno/externo y externo con barras) montado en `DashboardTallerTab.vue`.
+- Specs: pytest 7 (mock PostgresClient) + request spec 202. Script validado
+  contra BD dev (ahorro $13,820, profit externo $6,235, beneficio total
+  $20,055). RuboCop 0, ESLint 0, build OK. Fix `.rubocop.yml`: excluir
+  `config/routes/**/*` de `Metrics/BlockLength`.
+- Docs: `services/WorkshopVariableCostsService.md` (fórmulas), `endpoints.md`.
 
 ## Despliegue
 
