@@ -38,6 +38,8 @@ hace `create`, `nextval` devuelve un id que ya existe →
 | `TravelCount` | travel_counts |
 | `EmployeeAppointment` | employee_appointments |
 | `EmployeesIncidence` | employees_incidences |
+| `VehicleAsignation` | vehicle_asignations |
+| `DriverRequest` | driver_requests |
 
 Cada `include` lleva una leyenda "eliminar este include cuando se retire PHP".
 
