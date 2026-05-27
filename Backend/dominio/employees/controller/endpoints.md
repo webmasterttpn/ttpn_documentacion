@@ -266,6 +266,29 @@ Cookie: _ttpngas_session=...
 
 ---
 
+## 📎 Documentos del Empleado (archivo)
+
+`Api::V1::EmployeeDocumentsController` (`resources :employee_documents`). La
+metadata del documento normalmente se guarda como nested attribute del empleado
+(`employee_documents_attributes`); este endpoint sirve para **subir el archivo**
+(`doc_image`) y editar un documento puntual.
+
+### PUT /api/v1/employee_documents/:id
+
+- Multipart: `employee_document[doc_image]` (imagen o PDF). También acepta
+  `numero`, `expiracion`, `descripcion`, `employee_document_type_id`,
+  `remove_doc_image` ('1' para purgar el archivo).
+- `numero`/`expiracion` son **alias** de las columnas `identificador`/`vigencia`
+  (`EmployeeDocument.alias_attribute`); el FE y el serializer usan numero/expiracion.
+- Respuesta: `{ id, employee_id, employee_document_type_id, numero, expiracion,
+  descripcion, doc_image_url }`.
+
+El FE (`EmployeeForm.vue`) adjunta el archivo inline por documento y lo sube tras
+guardar el empleado (igual que vehículos), emparejando documentos nuevos por
+`employee_document_type_id|numero`.
+
+---
+
 ## 🔐 Autenticación
 
 Todos los endpoints requieren autenticación mediante sesión de Rails.
