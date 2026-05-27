@@ -152,6 +152,41 @@ concern `Auditable` desde `Current.user` (configurado en `BaseController`); son
 
 ---
 
+## Endpoints de historial (lazy load)
+
+Dos endpoints de colección devuelven el historial con **carga perezosa** para no
+traer años de asignaciones de golpe (la pantalla se sentía lenta al abrir un
+colapse):
+
+- `GET /api/v1/vehicle_asignations/vehicle_history/:vehicle_id`
+- `GET /api/v1/vehicle_asignations/employee_history/:employee_id`
+
+**Comportamiento (compartido vía `render_history`):**
+
+- **Carga inicial** (sin `older_page`): trae la asignación **ACTIVA siempre**
+  (`fecha_hasta IS NULL`, aunque sea más vieja que la ventana) **+** todas las de
+  los últimos `HISTORY_WINDOW_DAYS` (15) días. Orden `fecha_efectiva DESC`.
+- **Lotes viejos** (`?older_page=N`): trae `HISTORY_OLDER_BATCH` (5) asignaciones
+  **ya finalizadas** y más viejas que la ventana, de la más reciente a la más
+  antigua (offset = `(N-1)*5`).
+- Respuesta: `{ data: [...], has_more: <bool> }`. `has_more` indica si quedan
+  lotes por traer. El FE usa `q-infinite-scroll` (índice 1 = inicial, índice > 1 →
+  `older_page = índice - 1`).
+
+Como la asignación activa de un empleado/vehículo siempre tiene el `fecha_efectiva`
+máximo (las anteriores se finalizan al crear una nueva, ver callback arriba), la
+ventana inicial + "activa siempre" no deja huecos y los lotes viejos avanzan en el
+tiempo sin solaparse.
+
+`history_item` incluye **vehículo y empleado** anidados, para que `employee_history`
+muestre de qué unidad fue cada asignación y `vehicle_history` de qué chofer.
+
+> FE: vista por empleado en `EmployeeHistory.vue` (lista plana, no colapsable);
+> colapse por unidad en `VehicleHistory.vue` (con área de scroll propia). El
+> selector de empleado en `VehicleAsignationsPage.vue` alterna entre ambas vistas.
+
+---
+
 ## Archivos relacionados
 
 - `app/models/vehicle_asignation.rb`
