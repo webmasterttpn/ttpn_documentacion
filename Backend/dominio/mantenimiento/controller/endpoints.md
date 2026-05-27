@@ -40,28 +40,35 @@ No encontrado: `{ error: ... }` (404). Sin token: 401.
 | `POST /mtto/work_orders/:id/start` | id. | activated/paused → in_progress |
 | `POST /mtto/work_orders/:id/pause` | id. | in_progress → paused |
 | `POST /mtto/work_orders/:id/resume` | id. | paused → in_progress |
-| `POST /mtto/work_orders/:id/complete` | `ReconcileMaterialsService` + id. | concilia residuo/scrap + → completed (`actual_minutes`) |
+| `POST /mtto/work_orders/:id/complete` | `WorkOrderProgressService` | → completed (`actual_minutes`) |
 | `POST /mtto/work_orders/:id/cancel` | id. | → cancelled |
+| `POST /mtto/work_orders/:id/return_materials` | `ReconcileMaterialsService` | retorno de material (residuo/scrap/merma) sin cambiar estado |
 
 Transición/recepción/salida inválida → 422 `{ error: ... }`.
 
-### `POST /mtto/work_orders/:id/complete` con conciliación de residuo/scrap
+### `POST /mtto/work_orders/:id/return_materials` (retorno de material por OT)
 
-Acepta un body **opcional** `reconciliation` para conciliar el material
-consumido al cerrar la OT (residuo recuperable vs. scrap no recuperable):
+Apartado dedicado de **Retorno de material**: por cada línea de salida procesada,
+concilia el sobrante. **No** cambia el estado de la OT (puede correrse cuantas
+veces haga falta mientras haya material que conciliar). Reemplaza la captura que
+antes vivía en el cierre.
 
 ```text
 { "reconciliation": [
-    { "transfer_item_id": 12, "residue": 3.0, "scrap": 2.0 }, ...
+    { "transfer_item_id": 12, "residue": 3.0, "scrap": 2.0, "scrap_reason": "scrap" }, ...
 ] }
 ```
 
-- Corre `Mtto::ReconcileMaterialsService` (residuo → `quantity_recovered` $0 +
-  movimiento `residue_return`; scrap → solo `quantity_scrapped`, no cambia
-  stock) y luego la transición `complete`.
-- Sin `reconciliation`: cierra con residuo/scrap = 0 (comportamiento previo).
-- Errores → 422: línea ajena a la OT (`InvalidLine`), residuo + scrap mayor a lo
-  consumido (`RecordInvalid`), o transición inválida.
+- `residue` (reutilizable) → suma al `quantity_recovered` $0 (costo hundido) +
+  movimiento `residue_return` (delta, idempotente).
+- `scrap` (no recuperable) → solo fija `quantity_scrapped`; **no** cambia stock ni
+  costo. `scrap_reason` ∈ {`scrap`, `merma`} es **obligatorio** si `scrap > 0`
+  (etiqueta para reporte).
+- Errores → 422: línea ajena a la OT (`InvalidLine`); residuo + scrap mayor a lo
+  consumido o falta `scrap_reason` (`RecordInvalid`).
+
+> El endpoint `complete` ya **no** captura residuo/scrap (acepta `reconciliation`
+> por compatibilidad, pero el FE manda `{}`). El retorno se hace aquí.
 
 Ver `services/ReconcileMaterialsService.md` y `costeo_liquidos.md`.
 
@@ -79,7 +86,8 @@ campos base de la OT incluye:
   ],
   "materials": [                             # items de inventory_transfers.completed
     { "id", "product", "unit_of_measure",
-      "quantity_transferred", "unit_cost_charged", "line_cost" }
+      "quantity_transferred", "unit_cost_charged", "line_cost",
+      "quantity_residue_returned", "quantity_scrapped", "scrap_reason" }
   ],
   "transfers": [                             # TODAS las salidas vinculadas (cualquier estado)
     { "id", "transfer_number", "status", "items_count", "total_cost" }

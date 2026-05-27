@@ -12,9 +12,12 @@ material, no al momento de la salida.
 
 | Parámetro | Tipo | Descripción |
 |---|---|---|
-| `work_order` | `Mtto::WorkOrder` | OT que se está cerrando |
-| `lines` | `Array<Hash>` | `[{ transfer_item_id:, residue:, scrap: }, ...]` |
+| `work_order` | `Mtto::WorkOrder` | OT cuyo material se concilia |
+| `lines` | `Array<Hash>` | `[{ transfer_item_id:, residue:, scrap:, scrap_reason: }, ...]` |
 | `user:` | `User` | quién concilia (para el movimiento); default `Current.user` |
+
+`scrap_reason` ∈ {`scrap`, `merma`}, obligatorio cuando `scrap > 0` (etiqueta de
+reporte; mismo efecto de inventario/costo).
 
 ## Comportamiento
 
@@ -36,13 +39,15 @@ material, no al momento de la salida.
   pertenece a una salida **completada** de esta OT.
 - `ActiveRecord::RecordInvalid` — residuo + scrap exceden lo consumido.
 
-El controller (`POST /mtto/work_orders/:id/complete`) rescata ambos → 422.
+El controller rescata ambos → 422.
 
 ## Cuándo usarlo
 
-Solo desde `Api::V1::Mtto::WorkOrdersController#complete`, antes de la transición
-`complete` (`WorkOrderProgressService`). Con `lines` vacío no hace nada (la OT se
-cierra con residuo/scrap = 0, comportamiento previo).
+Principalmente desde `POST /mtto/work_orders/:id/return_materials` (apartado
+"Retorno de material" por OT) — **no** cambia el estado de la OT y puede correrse
+varias veces. Sigue siendo invocable desde `#complete` (acepta `reconciliation`
+por compatibilidad), pero el FE ya no captura el retorno en el cierre. Con `lines`
+vacío no hace nada.
 
 ## Dependencias
 

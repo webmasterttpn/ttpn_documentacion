@@ -36,17 +36,24 @@ hundido). Nunca se revalúa ni se recalcula el promedio por un retorno.
   `cost_layer = 'recovered'`. **No** toca `average_cost`. **No** hay costo de
   retorno.
 
-## Residuo recuperable vs. SCRAP (sobrante no recuperable)
+## Residuo recuperable vs. SCRAP/MERMA (sobrante no recuperable)
 
 Tras consumir un líquido, parte del sobrante puede **reutilizarse** y parte
-puede haberse **contaminado o perdido**. La conciliación al **cerrar la OT**
-(`Mtto::ReconcileMaterialsService`, vía `POST /work_orders/:id/complete`) separa
-ambos por línea de salida:
+puede haberse **contaminado o perdido**. El **apartado "Retorno de material"
+por OT** (`Mtto::ReconcileMaterialsService`, vía
+`POST /work_orders/:id/return_materials`) separa ambos por línea de salida.
+**No** cambia el estado de la OT y puede correrse varias veces. (Antes vivía en
+el cierre de la OT; ya no.)
 
 | Concepto | Campo | Efecto en inventario | Efecto en costo |
 |---|---|---|---|
 | **Residuo** (reutilizable) | `quantity_residue_returned` | `quantity_recovered += residuo` a $0 + movimiento `residue_return` | ninguno (ya estaba hundido) — aparece como ahorro al reusarse |
-| **Scrap** (contaminado / no recuperable) | `quantity_scrapped` | **ninguno** — el material ya salió del almacén y no vuelve | **ninguno** — el costo ya se hundió en la OT que lo consumió |
+| **No recuperable** (scrap/merma) | `quantity_scrapped` + `scrap_reason` | **ninguno** — el material ya salió del almacén y no vuelve | **ninguno** — el costo ya se hundió en la OT que lo consumió |
+
+**`scrap_reason`** (obligatorio cuando `quantity_scrapped > 0`) clasifica el no
+recuperable solo para reporte: `scrap` (contaminado/inservible, p.ej. líquido
+contaminado) o `merma` (pérdida/derrame/evaporación). Ambos tienen el **mismo
+efecto** (registro, sin tocar stock ni costo); el motivo distingue la causa.
 
 - Regla de oro: **si el líquido se contaminó, es scrap/desperdicio, no residuo.**
   El scrap **no** regresa al bucket recuperado (no se puede reusar) y **no**
