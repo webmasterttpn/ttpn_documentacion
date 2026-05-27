@@ -66,7 +66,37 @@ _(Puedes correrlo varias veces y no duplicará datos. Si quieres cambiar el barr
 
 ---
 
-## 5. ¡Ahorrar Tiempo! 👉 Comando TODO-EN-UNO (Master)
+## 5. ⚠️ OBLIGATORIO — Resincronizar Secuencias de PK (tras CADA importación)
+
+Cuando la base se restaura/importa con `id` **explícito** (volcado de Heroku,
+`COPY`, delta de cutover), las **secuencias de PK quedan atrasadas** respecto al
+`MAX(id)`. El backend no lo nota hasta que intentas **crear** un registro nuevo:
+PostgreSQL asigna un `id` que ya existe →
+`PG::UniqueViolation: duplicate key value violates "<tabla>_pkey"` → **500**.
+(Le pasó a `vehicle_asignations` el 2026-05-27.)
+
+**Hay que correr esto SIEMPRE, como ÚLTIMO paso, después de cualquier carga de
+datos** (y va incluido en el `all` del punto 6):
+
+**Ejecutar (cURL):**
+
+```bash
+curl -X POST https://kumi-api.up.railway.app/api/v1/system_maintenance/run_tasks \
+-H "Content-Type: application/json" \
+-d '{"task": "reset_sequences"}'
+```
+
+_(Dentro de Railway: `bin/rails db:reset_sequences`. Es idempotente y seguro;
+solo ajusta cada secuencia a `MAX(id)`. Corre **al final**, después de los
+backfills.)_
+
+> Nota: la migración `SyncPkSequencesForward` también sincroniza las secuencias
+> (forward-only) una vez en el deploy, pero un **import posterior** las vuelve a
+> desincronizar — por eso este paso es obligatorio tras cada carga de datos.
+
+---
+
+## 6. ¡Ahorrar Tiempo! 👉 Comando TODO-EN-UNO (Master)
 
 Si tu base recién fue migrada de volverse a volcar intacta y necesitas purgar _todo el texto_, _rellenar tablas_, y _crear privilegios_ al mismo tiempo sin correr uno por uno los puntos 1, 2 y 3, puedes simplemente dispararlos en cadena:
 
