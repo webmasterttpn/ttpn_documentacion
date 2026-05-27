@@ -40,6 +40,14 @@ que clasifique cada cantidad como **reutilizable** o **no recuperable + motivo
   material (solo lectura) + aviso si no hay material procesado + confirmar.
   `useWorkOrdersData`: el cierre ya no manda reconciliación.
 
+### Apartado de menú dedicado (además del botón en el detalle)
+- BE: filtro `with_materials=true` en `work_orders` index (scope `with_materials`
+  = OTs con salidas procesadas, incluye completadas).
+- FE: ítem de menú **"Retorno de material"** (Mantenimiento, tras Salidas) + ruta
+  `/mtto/material-returns` + `MaterialReturnsPage`: lista las OTs con material y
+  abre el `WorkOrderReturnDialog`. Gated por `mtto_work_orders` (sin privilegio
+  nuevo). El botón en el detalle de la OT se mantiene como acceso directo.
+
 ## Notas
 
 - El retorno puede aplicarse mientras la OT tenga material procesado (incluye OTs
