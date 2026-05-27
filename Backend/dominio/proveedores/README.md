@@ -24,10 +24,27 @@ Catálogo de proveedores externos: gasolineras, talleres y concesionarias. Los m
 
 ---
 
+## Clasificación de `Supplier` (servicio / consumo)
+
+`Supplier` tiene dos flags **independientes** (un proveedor puede ser ambos):
+
+| Campo | Tipo | Significado |
+| --- | --- | --- |
+| `provee_servicio` | boolean (default false) | Taller al que **mandamos trabajos** (servicios de mantenimiento) |
+| `provee_consumo` | boolean (default false) | Proveedor al que **le compramos** cosas (refacciones, insumos) |
+
+- Scopes: `Supplier.de_servicio`, `Supplier.de_consumo`.
+- Filtro en `GET /api/v1/suppliers?provee_servicio=true` / `?provee_consumo=true`.
+- Ambos van en el serializer (lista y detalle). Migración `20260527000004`.
+- Los registros existentes quedan en `false`/`false` (sin clasificar) — se marcan
+  desde el catálogo de Proveedores (FE: toggles en `SupplierForm`, chips en lista/detalle).
+- Uso previsto: el dropdown "Proveedor/Taller" del modal de Agendar servicio debe
+  filtrar `de_servicio`; compras/inventario filtran `de_consumo`.
+
 ## Notas de diseño
 
 - `GasStation` y `Concessionaire` están físicamente en este dominio pero se documentan también en Combustible y Servicios TTPN respectivamente, ya que son el punto de contacto principal.
-- `Supplier` solo tiene relación con Vehículos hoy. Si se amplía a compras generales, este dominio crecerá.
+- `Supplier` se relaciona con Vehículos (mantenimiento) y, vía `provee_consumo`, con compras/inventario de taller.
 
 ---
 
