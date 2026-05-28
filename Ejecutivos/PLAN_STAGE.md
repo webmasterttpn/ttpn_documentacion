@@ -2,6 +2,19 @@
 
 > **Estado:** **PAUSADO.** Documento de plan listo para ejecutar más adelante.
 > Primero priorizamos arreglar bugs y completar features en producción.
+>
+> **Avances ya aplicados a prod** (no hay que rehacerlos):
+>
+> - ✅ FE: `quasar.config.js` env-driven (respeta `process.env.API_URL` siempre).
+> - ✅ FE: `netlify.toml` creado (PWA build + env por contexto production/stage).
+> - ✅ FE: switch del repo en Netlify de GitLab → GitHub (2026-05-28).
+>   El FE ahora solo necesita push a `github main`.
+> - ✅ BE: `system_maintenance#run_tasks` protegido con `X-Maintenance-Token`.
+> - ✅ BE: Sidekiq Web con HTTP Basic Auth (SIDEKIQ_USER/PASSWORD).
+> - ✅ BE: ruta `/api/v1/system_maintenance/run_tasks` corregida (apuntaba mal).
+> - ✅ Env vars de hardening (MAINTENANCE_TOKEN, SIDEKIQ_USER, SIDEKIQ_PASSWORD)
+>   configuradas en Railway de prod (api + sidekiq).
+> - ✅ Doc `PASOS_TRAS_MIGRACION.md` con header `X-Maintenance-Token` en los cURL.
 
 ## 1. Contexto y objetivo
 
@@ -109,14 +122,11 @@ servicio API de Railway de PROD**: `MAINTENANCE_TOKEN`, `SIDEKIQ_USER`,
 
 **Frontend (`ttpn-frontend`):**
 
-- `quasar.config.js`: cambiar `apiUrl` para preferir `process.env.API_URL` siempre,
-  con `PROD_API_URL` como fallback solo en prod sin env. Lo mismo para `VITE_WS_URL`.
-- **`netlify.toml` (nuevo)**: env vars por contexto (`production`, `stage`) para
-  inyectar `API_URL` y `VITE_WS_URL` en cada build. Reemplaza la configuración via
-  dashboard (que el plan gratuito de Netlify no permite).
-- `public/_headers`: agregar `https://kumi-admin-api-staging.up.railway.app` y su
-  `wss://...` al `connect-src` del CSP.
-- `.env.example`: documentar `API_URL` y `VITE_WS_URL`.
+- ✅ `quasar.config.js`: env-driven (ya aplicado en commit `72c51ad`).
+- ✅ `netlify.toml`: env por contexto production/stage (ya aplicado, igual commit).
+- ⏳ `public/_headers`: agregar `https://kumi-admin-api-staging.up.railway.app` y
+  su `wss://...` al `connect-src` del CSP (pendiente cuando levantemos stage).
+- ⏳ `.env.example`: documentar `API_URL` y `VITE_WS_URL` (pendiente).
 
 Cada cambio preserva el comportamiento actual de prod (defaults). Tras pushear,
 verificar manualmente que `kumi.ttpn.com.mx` sigue funcionando idéntico.
