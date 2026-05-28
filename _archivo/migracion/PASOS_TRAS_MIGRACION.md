@@ -29,7 +29,7 @@ Al dividir la API, se agregaron `business_unit_id`, `created_by_id` y `updated_b
 **Ejecutar para rellenar (cURL):**
 
 ```bash
-curl -X POST https://kumi-api.up.railway.app/api/v1/system_maintenance/run_tasks \
+curl -X POST https://kumi-admin-api-production.up.railway.app/api/v1/system_maintenance/run_tasks \
 -H "Content-Type: application/json" \
 -H "X-Maintenance-Token: $MAINT_TOKEN" \
 -d '{"task": "backfill_tables"}'
@@ -44,7 +44,7 @@ Antes, el catálogo de concesionarios usaba un solo campo `nombre`. Ahora emplea
 **Ejecutar para fragmentar (cURL):**
 
 ```bash
-curl -X POST https://kumi-api.up.railway.app/api/v1/system_maintenance/run_tasks \
+curl -X POST https://kumi-admin-api-production.up.railway.app/api/v1/system_maintenance/run_tasks \
 -H "Content-Type: application/json" \
 -H "X-Maintenance-Token: $MAINT_TOKEN" \
 -d '{"task": "concessionaires"}'
@@ -61,7 +61,7 @@ Al crearse las barreras de autenticación nuevas, se introdujo el concepto de "P
 **Ejecutar configuración (cURL):**
 
 ```bash
-curl -X POST https://kumi-api.up.railway.app/api/v1/system_maintenance/run_tasks \
+curl -X POST https://kumi-admin-api-production.up.railway.app/api/v1/system_maintenance/run_tasks \
 -H "Content-Type: application/json" \
 -H "X-Maintenance-Token: $MAINT_TOKEN" \
 -d '{"task": "setup_modules"}'
@@ -76,7 +76,7 @@ Modificamos la forma en que el Backend construye las llaves largas y llaves de c
 **Ejecutar para sanar inventario (cURL):**
 
 ```bash
-curl -X POST https://kumi-api.up.railway.app/api/v1/ttpn_bookings/backfill_clvs \
+curl -X POST https://kumi-admin-api-production.up.railway.app/api/v1/ttpn_bookings/backfill_clvs \
 -H "Content-Type: application/json" \
 -d '{"days": 30}'
 ```
@@ -100,7 +100,7 @@ datos** (y va incluido en el `all` del punto 6):
 **Ejecutar (cURL):**
 
 ```bash
-curl -X POST https://kumi-api.up.railway.app/api/v1/system_maintenance/run_tasks \
+curl -X POST https://kumi-admin-api-production.up.railway.app/api/v1/system_maintenance/run_tasks \
 -H "Content-Type: application/json" \
 -H "X-Maintenance-Token: $MAINT_TOKEN" \
 -d '{"task": "reset_sequences"}'
@@ -144,7 +144,7 @@ sea de una versión más reciente.
 Si tu base recién fue migrada de volverse a volcar intacta y necesitas purgar _todo el texto_, _rellenar tablas_, y _crear privilegios_ al mismo tiempo sin correr uno por uno los puntos 1, 2 y 3, puedes simplemente dispararlos en cadena:
 
 ```bash
-curl -X POST https://kumi-api.up.railway.app/api/v1/system_maintenance/run_tasks \
+curl -X POST https://kumi-admin-api-production.up.railway.app/api/v1/system_maintenance/run_tasks \
 -H "Content-Type: application/json" \
 -H "X-Maintenance-Token: $MAINT_TOKEN" \
 -d '{"task": "all"}'
