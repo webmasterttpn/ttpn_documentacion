@@ -47,10 +47,50 @@ deploy de stage apuntaría a la API de prod o bloquearía el WebSocket:
 4. `ttpn-frontend/public/_headers` — CSP `connect-src` hardcodea solo la API de
    prod. Hay que agregar la API/WS de stage.
 
-Adicional (recomendado): **proteger** el endpoint
-`POST /api/v1/system_maintenance/run_tasks` con un header `X-Maintenance-Token`
-comparado contra `ENV['MAINTENANCE_TOKEN']`. Hoy está abierto (sin auth) — riesgo
-en prod.
+### Restricción del plan gratuito de Netlify (importante)
+
+El plan gratuito de Netlify **NO permite crear env vars en el dashboard** (es
+feature de team / planes de pago). Por eso el FE de stage NO puede fijar `API_URL`
+desde el panel. La solución es **`netlify.toml` con env por contexto**, que sí
+funciona en gratis (es build-time, no team feature):
+
+```toml
+# ttpn-frontend/netlify.toml — root del repo
+[build]
+  command = "npm ci && npm run build"
+  publish = "dist/spa"
+
+[context.production.environment]
+  API_URL = "https://kumi-admin-api-production.up.railway.app"
+  VITE_WS_URL = "wss://kumi-admin-api-production.up.railway.app"
+
+[context.stage.environment]
+  API_URL = "https://kumi-admin-api-staging.up.railway.app"
+  VITE_WS_URL = "wss://kumi-admin-api-staging.up.railway.app"
+```
+
+Netlify inyecta `process.env.API_URL` durante el build según el contexto (`main` →
+production, rama `stage` → context "stage"). Combinado con el blindaje del
+`quasar.config.js`, cada sitio queda apuntando correctamente sin tocar dashboard.
+
+### Hardening de prod (ya implementado en código — solo falta env vars)
+
+Ambos están **aplicados en el código** (commits separados); para que entren en vigor
+en prod, configurar las env vars en Railway:
+
+- **`MAINTENANCE_TOKEN`**: el endpoint `POST /system_maintenance/run_tasks` exige el
+  header `X-Maintenance-Token: <valor>`. Si la env está vacía en prod → el endpoint
+  responde 503. Sin coincidencia → 401. Los cURL del runbook
+  `PASOS_TRAS_MIGRACION.md` ya están actualizados con el header.
+- **`SIDEKIQ_USER` / `SIDEKIQ_PASSWORD`**: Sidekiq Web (`/sidekiq`) ahora usa HTTP
+  Basic Auth con `Rack::Auth::Basic` (`secure_compare`). El intento de proteger con
+  `authenticate :user, sadmin?` (Devise) **no funcionaba** porque la app es
+  `api_only = true` (sin sessions Devise). Sin las env en prod, Basic Auth deniega
+  TODO acceso.
+
+⚠️ **Tras desplegar este hardening, configurar de inmediato las 3 env vars en el
+servicio API de Railway de PROD**: `MAINTENANCE_TOKEN`, `SIDEKIQ_USER`,
+`SIDEKIQ_PASSWORD`. Para stage, las mismas (o distintas) cuando se levante.
 
 ## 4. Plan ejecutable (cuando se reanude)
 
@@ -71,6 +111,9 @@ en prod.
 
 - `quasar.config.js`: cambiar `apiUrl` para preferir `process.env.API_URL` siempre,
   con `PROD_API_URL` como fallback solo en prod sin env. Lo mismo para `VITE_WS_URL`.
+- **`netlify.toml` (nuevo)**: env vars por contexto (`production`, `stage`) para
+  inyectar `API_URL` y `VITE_WS_URL` en cada build. Reemplaza la configuración via
+  dashboard (que el plan gratuito de Netlify no permite).
 - `public/_headers`: agregar `https://kumi-admin-api-staging.up.railway.app` y su
   `wss://...` al `connect-src` del CSP.
 - `.env.example`: documentar `API_URL` y `VITE_WS_URL`.
@@ -112,13 +155,15 @@ DNS. Ver Anexo abajo.
 |---|---|---|
 | ttpngas | `config/application.rb` | ActionCable origins env-driven |
 | ttpngas | `config/environments/production.rb` | hosts += RAILWAY_PUBLIC_DOMAIN |
-| ttpngas | `app/controllers/api/v1/system_maintenance_controller.rb` | Header MAINTENANCE_TOKEN |
-| ttpngas | `.env.example` | Documentar variables |
+| ttpngas | `app/controllers/api/v1/system_maintenance_controller.rb` | ✅ **Ya hecho**: header `X-Maintenance-Token` |
+| ttpngas | `config/routes.rb` | ✅ **Ya hecho**: Sidekiq Web via HTTP Basic Auth (SIDEKIQ_USER/PASSWORD) |
+| ttpngas | `.env.example` | Documentar `FRONTEND_URL_EXTRA`, `MAINTENANCE_TOKEN`, `SIDEKIQ_USER`, `SIDEKIQ_PASSWORD` |
 | ttpn-frontend | `quasar.config.js` | apiUrl/wsUrl respetan env en prod |
+| ttpn-frontend | `netlify.toml` (nuevo) | Env por contexto (production / stage) — sustituye dashboard |
 | ttpn-frontend | `public/_headers` | CSP allow stage API/WS |
 | ttpn-frontend | `.env.example` | Documentar variables |
 | Documentación | `Documentacion/INFRA/migracion/SETUP_STAGE.md` | Copiar Anexo de abajo como guía operativa |
-| Documentación | `Documentacion/_archivo/migracion/PASOS_TRAS_MIGRACION.md` | Actualizar cURL con header `X-Maintenance-Token` |
+| Documentación | `Documentacion/_archivo/migracion/PASOS_TRAS_MIGRACION.md` | ✅ **Ya hecho**: cURL con `X-Maintenance-Token: $MAINT_TOKEN` |
 
 ## 6. Verificación
 
@@ -248,16 +293,19 @@ WHATSAPP_WEBHOOK_SECRET=
 WHATSAPP_VERIFY_TOKEN=
 
 MAINTENANCE_TOKEN=<generar 32 bytes hex; ver abajo>
+SIDEKIQ_USER=admin
+SIDEKIQ_PASSWORD=<generar 24 bytes hex; ver abajo>
 
 PYTHON_BIN=python3
 LOG_LEVEL=INFO
 ```
 
-**Cómo generar SECRET_KEY_BASE y MAINTENANCE_TOKEN:**
+**Cómo generar SECRET_KEY_BASE / MAINTENANCE_TOKEN / SIDEKIQ_PASSWORD:**
 
 ```bash
-ruby -rsecurerandom -e 'puts SecureRandom.hex(64)'  # para SECRET_KEY_BASE
-ruby -rsecurerandom -e 'puts SecureRandom.hex(32)'  # para MAINTENANCE_TOKEN
+ruby -rsecurerandom -e 'puts SecureRandom.hex(64)'  # SECRET_KEY_BASE
+ruby -rsecurerandom -e 'puts SecureRandom.hex(32)'  # MAINTENANCE_TOKEN
+ruby -rsecurerandom -e 'puts SecureRandom.hex(24)'  # SIDEKIQ_PASSWORD
 ```
 
 **Notas:**
@@ -294,6 +342,10 @@ la mezcla.
 
 ## A.5 Crear el sitio de Netlify (stage)
 
+> El plan gratuito de Netlify NO permite env vars en el dashboard, **pero no se
+> necesita** — el `netlify.toml` (Parte A) las inyecta automáticamente según el
+> contexto (rama `stage` → `[context.stage.environment]`).
+
 1. <https://app.netlify.com> → **Add new site → Import an existing project**.
 2. **Deploy with GitLab** → autorizar si pide.
 3. Seleccionar **`TTPN_Antonio/ttpn-frontend`**.
@@ -302,12 +354,8 @@ la mezcla.
    - **Base directory**: vacío.
    - **Build command**: `npm ci && npm run build`.
    - **Publish directory**: `dist/spa`.
-5. **Site settings → Environment variables → Add a variable**:
-   - `API_URL` = URL del API de Railway (A.3.5), **sin slash al final**.
-     Ej.: `https://kumi-admin-api-staging.up.railway.app`.
-   - `VITE_WS_URL` = lo mismo pero `wss://` en vez de `https://`.
-6. **Site settings → General → Site name** → `kumi-stage`.
-7. **Deploys → Trigger deploy → Clear cache and deploy site**.
+5. **Site settings → General → Site name** → `kumi-stage`.
+6. **Deploys → Trigger deploy → Clear cache and deploy site**.
 
 El sitio queda en `https://kumi-stage.netlify.app`. Abrirlo: el login debe cargar y,
 al intentar loguearte (con un usuario de la DB de stage que aún no hay datos), debe
@@ -406,7 +454,22 @@ que su ORM no soporte pgbouncer.
 `FRONTEND_URL_EXTRA`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`,
 `AWS_BUCKET`, `GMAIL_USER`, `GMAIL_PASSWORD`, `N8N_WEBHOOK_URL`,
 `WHATSAPP_API_URL`, `WHATSAPP_API_TOKEN`, `WHATSAPP_WEBHOOK_SECRET`,
-`WHATSAPP_VERIFY_TOKEN`, `MAINTENANCE_TOKEN`, `PYTHON_BIN`, `LOG_LEVEL`.
+`WHATSAPP_VERIFY_TOKEN`, `MAINTENANCE_TOKEN`, `SIDEKIQ_USER`, `SIDEKIQ_PASSWORD`,
+`PYTHON_BIN`, `LOG_LEVEL`.
+
+### A.10.1.bis Variables a configurar AHORA en Railway de PROD (urgente)
+
+Tras el deploy del hardening (commit del Sidekiq Basic Auth + token de
+mantenimiento), estos 3 deben estar puestos en el servicio `api` (y en `sidekiq`
+si tiene su propia env):
+
+- `MAINTENANCE_TOKEN` — generar con `ruby -rsecurerandom -e 'puts SecureRandom.hex(32)'`.
+- `SIDEKIQ_USER` — `admin` está bien.
+- `SIDEKIQ_PASSWORD` — generar con `ruby -rsecurerandom -e 'puts SecureRandom.hex(24)'`.
+
+Si no se configuran, el endpoint `/system_maintenance/run_tasks` responde 503 y
+`/sidekiq` queda inaccesible. Eso es **intencional** (mejor inaccesible que
+expuesto). Configurar y reiniciar el servicio.
 
 ### A.10.2 Variables — Netlify stage
 

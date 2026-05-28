@@ -4,6 +4,13 @@ Este documento es una lista de verificación (checklist) crítica para ejecutar 
 
 Para que no batalles con accesos a la Nube, **hemos creado 4 comandos remotos `cURL`** que puedes copiar y pegar de forma independiente desde la terminal de tu computadora local (VSCode/Mac) después de subir el código y migrar la base. Tu servidor de Railway los ejecutará automáticamente.
 
+> ⚠️ **Autenticación obligatoria.** Todos los cURL exigen el header
+> `X-Maintenance-Token: <valor>` donde `<valor>` debe coincidir **exactamente**
+> con la env `MAINTENANCE_TOKEN` configurada en Railway. Sin la env (o con header
+> distinto), el endpoint responde 401/503. Antes de empezar, exporta el token en
+> tu shell local: `export MAINT_TOKEN="<el-valor-de-Railway>"` — los ejemplos lo
+> usan con `-H "X-Maintenance-Token: $MAINT_TOKEN"`.
+
 ---
 
 ## 1. Asignación de Usuarios Raíz y Unidades de Negocio (Tablas Nuevas)
@@ -15,6 +22,7 @@ Al dividir la API, se agregaron `business_unit_id`, `created_by_id` y `updated_b
 ```bash
 curl -X POST https://kumi-api.up.railway.app/api/v1/system_maintenance/run_tasks \
 -H "Content-Type: application/json" \
+-H "X-Maintenance-Token: $MAINT_TOKEN" \
 -d '{"task": "backfill_tables"}'
 ```
 
@@ -29,6 +37,7 @@ Antes, el catálogo de concesionarios usaba un solo campo `nombre`. Ahora emplea
 ```bash
 curl -X POST https://kumi-api.up.railway.app/api/v1/system_maintenance/run_tasks \
 -H "Content-Type: application/json" \
+-H "X-Maintenance-Token: $MAINT_TOKEN" \
 -d '{"task": "concessionaires"}'
 ```
 
@@ -45,6 +54,7 @@ Al crearse las barreras de autenticación nuevas, se introdujo el concepto de "P
 ```bash
 curl -X POST https://kumi-api.up.railway.app/api/v1/system_maintenance/run_tasks \
 -H "Content-Type: application/json" \
+-H "X-Maintenance-Token: $MAINT_TOKEN" \
 -d '{"task": "setup_modules"}'
 ```
 
@@ -83,6 +93,7 @@ datos** (y va incluido en el `all` del punto 6):
 ```bash
 curl -X POST https://kumi-api.up.railway.app/api/v1/system_maintenance/run_tasks \
 -H "Content-Type: application/json" \
+-H "X-Maintenance-Token: $MAINT_TOKEN" \
 -d '{"task": "reset_sequences"}'
 ```
 
@@ -103,6 +114,7 @@ Si tu base recién fue migrada de volverse a volcar intacta y necesitas purgar _
 ```bash
 curl -X POST https://kumi-api.up.railway.app/api/v1/system_maintenance/run_tasks \
 -H "Content-Type: application/json" \
+-H "X-Maintenance-Token: $MAINT_TOKEN" \
 -d '{"task": "all"}'
 ```
 
