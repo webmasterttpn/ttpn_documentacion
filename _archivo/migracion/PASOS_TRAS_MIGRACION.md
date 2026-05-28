@@ -107,6 +107,29 @@ backfills.)_
 
 ---
 
+## 5.bis ⚠️ OBLIGATORIO tras restore de respaldo — re-ejecutar `db:migrate`
+
+Si el cutover trae un `pg_restore --clean --if-exists`, el dump del legacy
+**sobreescribe `schema_migrations` con las migraciones del legacy** y restaura
+las tablas con la estructura vieja (p.ej. `employees.password` en vez de
+`employees.token_firebase`). Las migraciones que renombran/recolumna columnas
+quedan "pendientes" desde el punto de vista del nuevo Rails.
+
+**Después del restore — antes de los cURL de arriba — corre `db:migrate`** para
+que se apliquen las migraciones nuevas (rename de `password → token_firebase`,
+forward-only de PK sequences, etc.). El runbook lo asegura reiniciando el
+servicio (`bin/rails db:prepare` corre en el startup del contenedor), pero si
+no reinicias, dispáralo a mano:
+
+- Dentro de Railway: `bin/rails db:migrate`
+- O reinicia el servicio para que el CMD del Dockerfile ejecute `db:prepare`.
+
+Las migraciones que aplican rename/transform son **idempotentes** (verifican
+`column_exists?` antes de actuar), así que es seguro re-correr aunque el dump
+sea de una versión más reciente.
+
+---
+
 ## 6. ¡Ahorrar Tiempo! 👉 Comando TODO-EN-UNO (Master)
 
 Si tu base recién fue migrada de volverse a volcar intacta y necesitas purgar _todo el texto_, _rellenar tablas_, y _crear privilegios_ al mismo tiempo sin correr uno por uno los puntos 1, 2 y 3, puedes simplemente dispararlos en cadena:
