@@ -17,6 +17,15 @@ Para que no batalles con accesos a la Nube, **hemos creado 4 comandos remotos `c
 
 Al dividir la API, se agregaron `business_unit_id`, `created_by_id` y `updated_by_id` a decenas de tablas como validaciones estrictas de trazabilidad y multi-tenancy. La base vieja los tendrá nulos (`nil`). Este proceso asocia los registros viejos a tu Unidad de Negocio Principal y al Usuario Administrador raíz en todos los catálogos.
 
+> **Tablas operativas cubiertas** (`db:post_migration_backfill`): `clients`,
+> `vehicles`, `vehicle_asignations`, `driver_requests`, `service_appointments`,
+> `ttpn_bookings`, `travel_counts`, `gas_charges`, `gas_files`,
+> `gasoline_charges`, `employees`, `concessionaires`, `invoice_types`, `labors`.
+> Si una fila de alguna de esas tablas queda con `business_unit_id` NULL, el
+> filtro multitenant la excluye en TODOS los reportes y dashboards (cuadre de
+> servicios, gasolina, viajes). **Si ves números en cero después del cutover,
+> casi siempre falta correr este paso.**
+
 **Ejecutar para rellenar (cURL):**
 
 ```bash
