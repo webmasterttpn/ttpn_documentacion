@@ -187,7 +187,50 @@ Los TBs con `viaje_encontrado=false` en la corrida de nómina del 4-jun-2026 gen
 
 ### 6.1 Drilldown del cuadre muestra CLVs distintos entre TB y TC cuadrados
 
-Causa: trigger PG `sp_tctb_insert` generaba CLV en hora UTC. **FIXEADO en migration `20260529101804`**. Aplicar la migration y correr `cuadre:fill_clvs REBUILD=true` para realinear histórico.
+Causa: trigger PG `sp_tctb_insert` generaba CLV en hora UTC. **FIXEADO en migration `20260529101804`**. Aplicar la migration con `bundle exec rails db:migrate` resuelve los TCs futuros.
+
+**⚠️ Para realinear el histórico el rake REBUILD NO sirve**: el regex `\d+-\d{4}-...` es estructural (CLVs con hora UTC cumplen igual que CLVs con hora local). El rake los saltará reportando "0 realineados". Hay que correr SQL UPDATE quirúrgico que aplica la fórmula con `AT TIME ZONE`:
+
+```sql
+UPDATE travel_counts tc
+SET clv_servicio = cbo.client_id::text || '-' ||
+                   tc.fecha::text || '-' ||
+                   to_char(
+                     (('2000-01-01'::date + tc.hora) AT TIME ZONE 'UTC' AT TIME ZONE 'America/Chihuahua')::time,
+                     'HH24:MI:SS'
+                   ) || '-' ||
+                   tc.ttpn_service_type_id::text || '-' ||
+                   tc.ttpn_foreign_destiny_id::text || '-' ||
+                   tc.vehicle_id::text,
+    updated_at = NOW()
+FROM client_branch_offices cbo
+WHERE cbo.id = tc.client_branch_office_id
+  AND tc.fecha >= CURRENT_DATE - INTERVAL '15 days'
+  AND tc.client_branch_office_id IS NOT NULL
+  AND tc.hora IS NOT NULL;
+```
+
+Idempotente — si el CLV ya está en hora local, produce el mismo valor. Validar con el cross-check de §4.3.
+
+Si los TBs también requieren realineación (caso raro — el callback Ruby los genera bien), análogo:
+
+```sql
+UPDATE ttpn_bookings tb
+SET clv_servicio = tb.client_id::text || '-' ||
+                   tb.fecha::text || '-' ||
+                   to_char(
+                     (('2000-01-01'::date + tb.hora) AT TIME ZONE 'UTC' AT TIME ZONE 'America/Chihuahua')::time,
+                     'HH24:MI:SS'
+                   ) || '-' ||
+                   tb.ttpn_service_type_id::text || '-' ||
+                   ts.ttpn_foreign_destiny_id::text || '-' ||
+                   tb.vehicle_id::text,
+    updated_at = NOW()
+FROM ttpn_services ts
+WHERE ts.id = tb.ttpn_service_id
+  AND tb.fecha >= CURRENT_DATE - INTERVAL '15 days'
+  AND tb.hora IS NOT NULL;
+```
 
 ### 6.2 Cuadre Nivel 1 nunca dispara (todo cae a Nivel 2)
 
