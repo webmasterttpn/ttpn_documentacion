@@ -85,50 +85,84 @@ _(Puedes correrlo varias veces y no duplicará datos. Si quieres cambiar el barr
 
 ---
 
-## 4.bis ⚠️ OBLIGATORIO tras cutover — Rellenar `clv_servicio` en TB y TC
+## 4.bis ⚠️ OBLIGATORIO tras cutover — Rellenar/realinear `clv_servicio` en TB y TC
 
 El paso 4 anterior solo cubre `clv_servicio_completa` de `ttpn_bookings`. Falta
-rellenar **`clv_servicio`** (clave de match Nivel 1) en `ttpn_bookings` Y
-`travel_counts` para que el **Cuadre de Servicios** funcione correctamente
-mostrando los pares TB↔TC y los CLVs comparables.
+**`clv_servicio`** (clave de match Nivel 1) en `ttpn_bookings` Y `travel_counts`
+para que el **Cuadre de Servicios** funcione correctamente, mostrando los pares
+TB↔TC con CLVs comparables.
 
-**Síntoma si no se corre**: en la vista de detalle del cuadre, los TBs cuadrados
-salen sin `CLV servicio`, los TCs cuadrados también, y los pares lado a lado se
-ven sin clave de match (el FE muestra `—` en la columna CLV). El match en sí
-funciona (lo hace `TtpnCuadreService` con FK `travel_count_id`/`ttpn_booking_id`)
-pero el usuario no puede verificar visualmente el nivel del match.
+Hay dos escenarios separados que cubre el mismo rake:
+
+| Modo | Cuándo | Comportamiento |
+| --- | --- | --- |
+| **Backfill** (default) | Datos legacy con `clv_servicio = NULL` | Solo rellena filas NULL — no toca lo que ya tiene valor |
+| **REBUILD=true** | Datos legacy con **formato viejo** (ej. `72026-05-0416:15163` sin guiones) | Reescribe TODA fila cuyo CLV no cumpla el regex canónico, deja iguales las ya canónicas |
+
+**Síntoma si no se corre el backfill**: en el drilldown del cuadre los TBs/TCs
+salen con CLV `—`. El match operativo funciona via FK
+`travel_count_id`/`ttpn_booking_id`, pero el usuario no puede verificar
+visualmente el nivel del match.
+
+**Síntoma si NO se corre REBUILD post-cutover de PHP**: en el drilldown los CLV
+TB salen con formato ilegible sin separadores (`72026-05-0416:15163`) y los CLV
+TC con formato canónico (`7-2026-05-04-09:15:00-1-1-3`). El match Nivel 1
+(`clv_servicio` exacto) NUNCA dispara para los legacy — siempre cae a Nivel 2
+(ventana de tiempo, ~10× más lento). Se ve como descuadres "fantasma" donde TB y
+TC deberían pegarse pero el sistema no los reconoce como mismo viaje hasta
+correr el cuadre retroactivo (paso 4.ter).
 
 **Por qué pasa**: el `before_validation :generar_clv_servicio` solo dispara al
-guardar el registro. Datos legacy importados con `update_columns` o vía SQL/CSV
-directo no pasan por el callback. El rake aquí los rellena con el mismo formato
-canónico.
+guardar el registro vía Rails. Datos legacy importados con `update_columns`,
+via SQL crudo, o que vienen del CRUD PHP no pasan por el callback.
 
 **Ejecutar (railway run)**:
 
 ```bash
+# Backfill simple — solo rellena NULL (default últimos 30 días)
 railway run --service kumi-admin-api bundle exec rails cuadre:fill_clvs
+
+# Backfill con más histórico
+railway run --service kumi-admin-api bundle exec rails cuadre:fill_clvs DAYS=90
+
+# REBUILD — reescribe legacy a formato canónico (obligatorio post-cutover de PHP)
+railway run --service kumi-admin-api bundle exec rails cuadre:fill_clvs DAYS=60 REBUILD=true
 ```
 
-_(Default: últimos 30 días. Para más histórico: `DAYS=90` o el rango que
-quieras. Idempotente — solo toca filas con `clv_servicio IS NULL`. Usa
-`update_columns` así que NO dispara los callbacks del `TtpnCuadreService`
-ni de auditoría.)_
+Idempotente en ambos modos:
+
+- Sin `REBUILD`: solo toca filas con `clv_servicio IS NULL`.
+- Con `REBUILD=true`: detecta el regex canónico
+  `\d+-\d{4}-\d{2}-\d{2}-\d{2}:\d{2}:\d{2}-\d+-\d+-\d+` y deja intactas las que
+  ya cumplen.
+
+Usa `update_columns` así que NO dispara callbacks del `TtpnCuadreService` ni de
+auditoría — el cuadre se reconstruye después en paso 4.ter.
 
 Verificación rápida después de correrlo:
 
 ```sql
--- Debe acercarse a 0
+-- Backfill: ambos counts deben acercarse a 0
 SELECT COUNT(*) FROM ttpn_bookings
 WHERE clv_servicio IS NULL AND fecha >= CURRENT_DATE - INTERVAL '30 days';
 
 SELECT COUNT(*) FROM travel_counts
 WHERE clv_servicio IS NULL AND fecha >= CURRENT_DATE - INTERVAL '30 days';
+
+-- REBUILD: ambos counts deben ser 0 (no quedan formatos legacy)
+SELECT COUNT(*) FROM ttpn_bookings
+WHERE fecha >= CURRENT_DATE - INTERVAL '60 days'
+  AND clv_servicio !~ '^\d+-\d{4}-\d{2}-\d{2}-\d{2}:\d{2}:\d{2}-\d+-\d+-\d+$';
+
+SELECT COUNT(*) FROM travel_counts
+WHERE fecha >= CURRENT_DATE - INTERVAL '60 days'
+  AND clv_servicio !~ '^\d+-\d{4}-\d{2}-\d{2}-\d{2}:\d{2}:\d{2}-\d+-\d+-\d+$';
 ```
 
 > Nota: los registros nuevos creados a través de los flujos normales del API
 > (no por SQL directo ni importación masiva sin `save`) tendrán `clv_servicio`
-> automáticamente. Este rake es solo para datos legacy del cutover y para
-> backfills posteriores donde alguien haya saltado el callback.
+> automáticamente en formato canónico. Este rake es solo para datos legacy del
+> cutover y para backfills posteriores donde alguien haya saltado el callback.
 
 ---
 
