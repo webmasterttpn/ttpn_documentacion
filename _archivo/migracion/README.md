@@ -6,10 +6,9 @@ Documentación completa para migrar, mantener y auditar la base de datos de Kumi
 
 | Archivo | Propósito |
 | --- | --- |
-| [PLAN_PRODUCCION.md](PLAN_PRODUCCION.md) | **Playbook completo de cutover** a producción: pre-vuelo, backup, restore, backfill, verificación, rollback |
+| [PASOS_TRAS_MIGRACION.md](PASOS_TRAS_MIGRACION.md) | **Runbook único del cutover**: 9 pasos en orden estricto (db:migrate, backfills, CLV REBUILD, SQL timezone, SQL retroactivo cuadre, reset_sequences). Leer este primero. |
 | [MIGRACION_DB.md](MIGRACION_DB.md) | Guía técnica: Heroku → Supabase, backfills por columna, enfoque CSV para tablas grandes |
 | [CAMBIOS_DB.md](CAMBIOS_DB.md) | Registro histórico de todos los cambios en BD desde `transform_to_api`. **Actualizar con cada migración relevante.** |
-| [PASOS_TRAS_MIGRACION.md](PASOS_TRAS_MIGRACION.md) | Comandos cURL de tareas post-restauración (backfill_tables, setup_modules, concessionaires, clvs) |
 
 ## Regla de mantenimiento
 

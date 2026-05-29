@@ -13,8 +13,8 @@ usuario: diferenciar **entradas/salidas** (a las 6:00 puede haber ~10 entradas y
   vista), mapea cada booking a evento:
   - `title` = CLV (`'Sin unidad'` si falta), `subtitle` = chofer · cliente.
   - `group` = `ttpn_service_type.nombre` ('Entrada'/'Salida').
-  - `color` = estado de cuadre (hue) + dirección (intensidad): programado `#21BA45`/`#15803D`,
-    pendiente `#F59E0B`/`#B45309`, cuadrado `#9E9E9E`/`#5F6368` (entrada/salida; **salida más oscura**).
+  - `color` = estado de cuadre (hue) + dirección (intensidad): 🟢 programado `#21BA45`/`#15803D`,
+    🟡 pendiente `#F59E0B`/`#B45309`,  ⚪ cuadrado `#9E9E9E`/`#5F6368` (entrada/salida; **salida más oscura**).
 - **Clic en evento** → `viewBooking` (de `useBookingCaptureData`) → `BookingCaptureDetailDialog`
   (solo lectura), superpuesto sin salir del calendario.
 
