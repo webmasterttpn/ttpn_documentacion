@@ -268,9 +268,14 @@ Ver memoria persistente `reference-cuadre-archivos-clave`. Resumen:
 - **Fase 1.A** — Alineación CLV. **DONE 2026-05-28.**
 - **Fase 1.B** — Cuadre TB async. **DONE 2026-05-29.**
 - **Refactor service + fix timezone trigger** — **DONE 2026-05-29.**
-- **Pruebas E2E** — 12 escenarios bash+curl+SQL. **PENDIENTE.**
+- **3 bugs históricos PG/job fixeados** — **DONE 2026-05-29** (commit `39f5c8d`):
+  - `sp_tctb_insert`/`sp_tctb_update` pasaban `client_branch_office_id` como `client_id` a buscar_booking. Migration `20260529112617`.
+  - `buscar_travel_id`/`buscar_booking_id` desempate por `max(id)` → ahora proximidad temporal. Migration `20260529113725`.
+  - `TtpnBookingImportJob` ahora setea `Current.import_mode=true` con ensure.
+- **Pruebas E2E ejecutadas** — 10/12 PASS, 11 confirmado por inspección + fix, 12 N/A. **DONE 2026-05-29.**
+- **Pendiente PHP**: `Gasto_INSERT_TRAVEL_COUNTS.php` falla al castear `status` boolean. Reportado.
 - **Fase 2** — Web mirror del flujo móvil (dashboard 4-KPI, drilldown, edición en hot, integración Samsara GPS). Post 4-jun.
-- **Fase 3** — Cleanup hardcoded, configurabilidad por BU, refactor funciones SQL, alineación funciones PG ventana a ±15min, fix `import_mode` en `TtpnBookingImportJob`, spec RSpec integration E2E.
+- **Fase 3** — Cleanup hardcoded, configurabilidad por BU, refactor funciones SQL, alineación funciones PG ventana a ±15min, spec RSpec integration E2E.
 
 ---
 
