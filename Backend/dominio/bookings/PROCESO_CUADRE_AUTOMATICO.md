@@ -1,7 +1,16 @@
 # Proceso de Cuadre Automático — TtpnBooking ↔ TravelCount
 
-**Última actualización:** 2026-04-15  
+**Última actualización:** 2026-05-29
 **Aplica a:** Kumi TTPN Admin V2 (API Rails)
+
+> ⚠️ **ACTUALIZACIÓN 2026-05-29 — Cuadre TB ahora es asíncrono.**
+> El cuadre que disparaban los callbacks síncronos `before_create :statuses` y `before_update :update_actualiza_tc` migró a un Sidekiq job: `Cuadre::TbMatchJob`. El save retorna inmediato (<100 ms) y el cuadre se resuelve en background con broadcast al `JobStatusChannel` del usuario al terminar.
+>
+> - Doc del job: [jobs/Cuadre_TbMatchJob.md](jobs/Cuadre_TbMatchJob.md)
+> - Callbacks actualizados en `app/models/ttpn_booking.rb`: `set_default_statuses` (create), `clear_stale_tc_link` (update), `enqueue_cuadre_job` (after_commit).
+> - El trigger Postgres del lado TC (`sp_tctb_insert`, `sp_tb_update`) **sigue síncrono** — la app móvil tolera el costo y el volumen es menor.
+>
+> Las secciones 4-8 de este doc describen el flujo síncrono histórico, mantenidas como referencia. Las secciones 1-3 (qué es, archivos, campos) siguen vigentes.
 
 ---
 
