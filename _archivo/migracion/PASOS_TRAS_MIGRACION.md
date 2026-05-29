@@ -85,6 +85,53 @@ _(Puedes correrlo varias veces y no duplicará datos. Si quieres cambiar el barr
 
 ---
 
+## 4.bis ⚠️ OBLIGATORIO tras cutover — Rellenar `clv_servicio` en TB y TC
+
+El paso 4 anterior solo cubre `clv_servicio_completa` de `ttpn_bookings`. Falta
+rellenar **`clv_servicio`** (clave de match Nivel 1) en `ttpn_bookings` Y
+`travel_counts` para que el **Cuadre de Servicios** funcione correctamente
+mostrando los pares TB↔TC y los CLVs comparables.
+
+**Síntoma si no se corre**: en la vista de detalle del cuadre, los TBs cuadrados
+salen sin `CLV servicio`, los TCs cuadrados también, y los pares lado a lado se
+ven sin clave de match (el FE muestra `—` en la columna CLV). El match en sí
+funciona (lo hace `TtpnCuadreService` con FK `travel_count_id`/`ttpn_booking_id`)
+pero el usuario no puede verificar visualmente el nivel del match.
+
+**Por qué pasa**: el `before_validation :generar_clv_servicio` solo dispara al
+guardar el registro. Datos legacy importados con `update_columns` o vía SQL/CSV
+directo no pasan por el callback. El rake aquí los rellena con el mismo formato
+canónico.
+
+**Ejecutar (railway run)**:
+
+```bash
+railway run --service kumi-admin-api bundle exec rails cuadre:fill_clvs
+```
+
+_(Default: últimos 30 días. Para más histórico: `DAYS=90` o el rango que
+quieras. Idempotente — solo toca filas con `clv_servicio IS NULL`. Usa
+`update_columns` así que NO dispara los callbacks del `TtpnCuadreService`
+ni de auditoría.)_
+
+Verificación rápida después de correrlo:
+
+```sql
+-- Debe acercarse a 0
+SELECT COUNT(*) FROM ttpn_bookings
+WHERE clv_servicio IS NULL AND fecha >= CURRENT_DATE - INTERVAL '30 days';
+
+SELECT COUNT(*) FROM travel_counts
+WHERE clv_servicio IS NULL AND fecha >= CURRENT_DATE - INTERVAL '30 days';
+```
+
+> Nota: los registros nuevos creados a través de los flujos normales del API
+> (no por SQL directo ni importación masiva sin `save`) tendrán `clv_servicio`
+> automáticamente. Este rake es solo para datos legacy del cutover y para
+> backfills posteriores donde alguien haya saltado el callback.
+
+---
+
 ## 5. ⚠️ OBLIGATORIO — Resincronizar Secuencias de PK (tras CADA importación)
 
 Cuando la base se restaura/importa con `id` **explícito** (volcado de Heroku,
