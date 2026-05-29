@@ -30,7 +30,7 @@ Documentacion/
 | [arquitectura/](INFRA/arquitectura/) | ADRs, arquitectura técnica, multi-tenant |
 | [infraestructura/](INFRA/infraestructura/) | Deploy, Railway, Netlify, Supabase, staging |
 | [seguridad/](INFRA/seguridad/) | RLS, CORS, security headers, checklist producción |
-| [onboarding/](INFRA/onboarding/) | Guía de desarrollador, setup BE/FE, nueva app |
+| [onboarding/](INFRA/onboarding/) | Guía de desarrollador, setup BE/FE, nueva app, [workflow Git](INFRA/onboarding/WORKFLOW_GIT.md) |
 | [operaciones/](INFRA/operaciones/) | Runbook de incidentes |
 | [database/](INFRA/database/) | ERD global (rails-erd), convenciones de esquema, migraciones críticas |
 | [Integraciones/](INFRA/Integraciones/) | Integraciones externas — Samsara (GPS/telemática): contexto, mapeo a Kumi e ideas |
