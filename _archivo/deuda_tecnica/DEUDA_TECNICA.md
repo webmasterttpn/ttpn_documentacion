@@ -11,6 +11,41 @@ Actualizar el `Status` y el bloque `Avance` en lugar de crear archivos nuevos.
 
 ---
 
+### DT-022 — PHP `Gasto_INSERT_TRAVEL_COUNTS.php` rompe casteo de `status` boolean
+
+**Registrada:** 2026-05-29 | **Dominio:** PHP legacy — `ttpn_php/` | **Severidad:** Media
+
+El archivo `ttpn_php/Gasto_INSERT_TRAVEL_COUNTS.php` concatena `$status` directo al SQL del INSERT (línea 24). Cuando el cliente envía `"status": 1` (integer) o `"status": true` (boolean), el SQL resultante es `INSERT INTO travel_counts Values(...,1,...)` y Postgres rechaza con:
+
+```
+SQLSTATE[42804]: column "status" is of type boolean but expression is of type integer
+```
+
+**Descubierto** durante E2E del cuadre 2026-05-29 al intentar crear TCs desde el script de pruebas. El flujo real de la app móvil probablemente envía un formato que casualmente funciona (`'t'`, `'true'` string), pero cualquier integración nueva o pruebas E2E fallan.
+
+**Fix sugerido** (línea 17 de `Gasto_INSERT_TRAVEL_COUNTS.php`, justo donde lee `$datos["status"]`):
+
+```php
+// ANTES
+$status = $datos["status"];
+
+// DESPUÉS
+$status = $datos["status"] ? 'true' : 'false';
+```
+
+Eso convierte el valor recibido (integer o boolean PHP) en literal SQL `true`/`false` que Postgres acepta al concatenarse.
+
+**Por qué no se fixea desde Claude**: el repo `ttpn_php/` es legacy de solo-lectura. El usuario aplica el fix manualmente y redeploya en Heroku (`pacific-river-53404.herokuapp.com`).
+
+**Verificación post-fix**: re-ejecutar el escenario 1 del E2E del cuadre con `create_tc_php` (revertir el script `scripts/e2e_cuadre/run_e2e.sh` para que use `create_tc_php` en lugar de `create_tc_rails`) y confirmar HTTP 200 + `respuesta:200` en el JSON del response.
+
+**Impacto si no se fixea**: ninguna app nueva puede insertar TCs vía PHP. La app móvil legacy sigue funcionando porque ya envía el formato compatible. No bloquea el cutover ni la nómina.
+
+**Avance:**
+- 2026-05-29 — bug detectado en E2E, reportado al usuario. Script E2E temporal usa `create_tc_rails` para los 12 escenarios.
+
+---
+
 ### DT-021 — Auto-crear `fixed_expense` al recibir mercancía en proyectos Mtto
 **Registrada:** 2026-05-20 | **Dominio:** Backend — mantenimiento/finanzas | **Severidad:** Media
 **Status:** Pendiente — diseño
