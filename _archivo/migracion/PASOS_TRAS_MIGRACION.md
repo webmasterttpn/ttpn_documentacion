@@ -13,6 +13,26 @@ Para que no batalles con accesos a la Nube, **hemos creado 4 comandos remotos `c
 
 ---
 
+## Orden de ejecución sugerido para el cutover (lunes 2-jun-2026)
+
+Hacer en este orden estricto:
+
+1. **Restaurar respaldo Heroku** sobre Supabase prod.
+2. **Paso 5.bis** — `railway run -- bundle exec rails db:migrate` (aplica las migrations nuevas, incluidos los 3 fixes del 2026-05-29: `20260529101804` timezone trigger, `20260529112617` client_id en trigger, `20260529113725` proximidad temporal en funciones PG).
+3. **Paso 6 (todo-en-uno)** — `task: "all"` para correr 1, 2, 3 en cadena (backfill BU, concesionarios, módulos).
+4. **Paso 4** — `backfill_clvs` cURL para `clv_servicio_completa` de TBs.
+5. **Paso 4.bis** — `cuadre:fill_clvs DAYS=60 REBUILD=true` (realineación estructural de CLVs legacy).
+6. **Paso 4.ter** — SQL UPDATE quirúrgico para hora local en TCs (el rake REBUILD no detecta offset de timezone).
+7. **Paso 4.qua** — SQL retroactivo cuadre TB ↔ TC (cuadra los huérfanos del rango).
+8. **Paso 5** — `reset_sequences` cURL.
+9. **Verificaciones finales** (ver sección final).
+
+Tras estos pasos, el sistema queda listo para captura operativa normal. Los nuevos viajes (TB-first vía Rails o TC-first vía PHP) se cuadran automáticamente en runtime (job `Cuadre::TbMatchJob` + triggers PG).
+
+> **Recomendación cron**: agregar el SQL del paso 4.qua a `sidekiq-cron` corriendo cada lunes 04:00 — reconcilia huérfanos que pudieran quedar por Sidekiq caído o redeploy. Idempotente.
+
+---
+
 ## 1. Asignación de Usuarios Raíz y Unidades de Negocio (Tablas Nuevas)
 
 Al dividir la API, se agregaron `business_unit_id`, `created_by_id` y `updated_by_id` a decenas de tablas como validaciones estrictas de trazabilidad y multi-tenancy. La base vieja los tendrá nulos (`nil`). Este proceso asocia los registros viejos a tu Unidad de Negocio Principal y al Usuario Administrador raíz en todos los catálogos.
@@ -163,6 +183,152 @@ WHERE fecha >= CURRENT_DATE - INTERVAL '60 days'
 > (no por SQL directo ni importación masiva sin `save`) tendrán `clv_servicio`
 > automáticamente en formato canónico. Este rake es solo para datos legacy del
 > cutover y para backfills posteriores donde alguien haya saltado el callback.
+
+---
+
+## 4.ter ⚠️ OBLIGATORIO tras cutover — Realinear hora local en `clv_servicio` de TCs
+
+**Por qué este paso adicional al 4.bis**: el rake REBUILD valida con un regex
+**estructural** (`HH:MM:SS` cumple igual sea hora UTC o local). Los TCs del
+respaldo Heroku tienen `clv_servicio` con **hora UTC** (porque el flujo PHP
+legacy no convertía timezone). El rake los salta reportando "0 realineados"
+porque ya cumplen el regex.
+
+**Síntoma si no se corre**: en el drilldown, los CLVs de TBs y TCs del mismo
+viaje difieren ~7h (TBs en local Chihuahua, TCs en UTC). El match Nivel 2
+(CLV exacto, usado para desempatar dobles) **nunca** dispara cross-source.
+Hallazgo confirmado 2026-05-29 con cross-check query.
+
+**Ejecutar (railway run psql o vía SQL Editor de Supabase)**:
+
+```sql
+UPDATE travel_counts tc
+SET clv_servicio = cbo.client_id::text || '-' ||
+                   tc.fecha::text || '-' ||
+                   to_char(
+                     (('2000-01-01'::date + tc.hora) AT TIME ZONE 'UTC' AT TIME ZONE 'America/Chihuahua')::time,
+                     'HH24:MI:SS'
+                   ) || '-' ||
+                   tc.ttpn_service_type_id::text || '-' ||
+                   tc.ttpn_foreign_destiny_id::text || '-' ||
+                   tc.vehicle_id::text,
+    updated_at = NOW()
+FROM client_branch_offices cbo
+WHERE cbo.id = tc.client_branch_office_id
+  AND tc.fecha >= CURRENT_DATE - INTERVAL '15 days'
+  AND tc.client_branch_office_id IS NOT NULL
+  AND tc.hora IS NOT NULL;
+```
+
+Idempotente — aplica la misma fórmula del trigger fixeado (migration
+`20260529101804`). Si el CLV ya está en hora local, produce el mismo valor.
+
+**Verificación cross-source** (la mayoría de pares ya cuadrados debe mostrar
+`clv_coinciden=true`; los que no coinciden son diferencias reales de timing
+entre la hora del TB programado y la hora que el chofer capturó):
+
+```sql
+SELECT tb.id AS tb_id, tb.clv_servicio AS tb_clv,
+       tc.id AS tc_id, tc.clv_servicio AS tc_clv,
+       (tb.clv_servicio = tc.clv_servicio) AS clv_coinciden,
+       EXTRACT(EPOCH FROM ((tc.fecha + tc.hora) - (tb.fecha + tb.hora))) AS diff_seg
+FROM ttpn_bookings tb
+JOIN travel_counts tc ON tc.id = tb.travel_count_id
+WHERE tb.viaje_encontrado = true
+  AND tb.created_at > NOW() - INTERVAL '7 days'
+ORDER BY tb.created_at DESC LIMIT 10;
+```
+
+---
+
+## 4.qua ⚠️ OPCIONAL pero recomendado tras cutover — SQL retroactivo del cuadre TB ↔ TC
+
+**Por qué**: el respaldo Heroku trae datos sin `viaje_encontrado` poblado para
+viajes del rango previo (TBs y TCs huérfanos). Los flujos en runtime
+(callback Rails `Cuadre::TbMatchJob` para TB-first, triggers PG para TC-first)
+solo aplican a registros **nuevos** o **modificados** post-cutover. Los
+históricos quedan sin pegar.
+
+**Solución**: un solo SQL que pega retroactivamente todos los pares
+candidatos del rango usando los campos clave + ventana ±15 min. Idempotente,
+atómico (un statement). Ver §1.A.2 del plan `~/.claude/plans/revisa-esto-para-ver-smooth-dusk.md`.
+
+**Ejecutar (SQL Editor de Supabase)** — ajustar el rango de fechas según necesidad:
+
+```sql
+WITH candidates AS (
+  SELECT
+    tb.id AS tb_id, tc.id AS tc_id,
+    tb.vehicle_id, tb.employee_id, tb.ttpn_service_type_id,
+    tb.client_id, ts.ttpn_foreign_destiny_id,
+    tb.fecha + tb.hora AS tb_dt,
+    tc.fecha + tc.hora AS tc_dt
+  FROM ttpn_bookings tb
+  JOIN ttpn_services ts ON ts.id = tb.ttpn_service_id
+  JOIN client_branch_offices cbo ON cbo.client_id = tb.client_id
+  JOIN travel_counts tc ON
+    tc.vehicle_id = tb.vehicle_id
+    AND tc.employee_id = tb.employee_id
+    AND tc.ttpn_service_type_id = tb.ttpn_service_type_id
+    AND tc.client_branch_office_id = cbo.id
+    AND tc.ttpn_foreign_destiny_id = ts.ttpn_foreign_destiny_id
+    AND ABS(EXTRACT(EPOCH FROM (tc.fecha + tc.hora) - (tb.fecha + tb.hora))) <= 900
+  WHERE tb.fecha BETWEEN CURRENT_DATE - INTERVAL '15 days' AND CURRENT_DATE + INTERVAL '5 days'
+    AND tb.status = true AND tc.status = true
+    AND (tb.viaje_encontrado IS NULL OR tb.viaje_encontrado = false)
+    AND (tc.viaje_encontrado IS NULL OR tc.viaje_encontrado = false)
+),
+tb_pos AS (
+  SELECT DISTINCT tb_id, vehicle_id, employee_id, ttpn_service_type_id,
+                  client_id, ttpn_foreign_destiny_id, tb_dt,
+                  ROW_NUMBER() OVER (
+                    PARTITION BY vehicle_id, employee_id, ttpn_service_type_id,
+                                 client_id, ttpn_foreign_destiny_id
+                    ORDER BY tb_dt, tb_id
+                  ) AS pos
+  FROM candidates
+),
+tc_pos AS (
+  SELECT DISTINCT tc_id, vehicle_id, employee_id, ttpn_service_type_id,
+                  client_id, ttpn_foreign_destiny_id, tc_dt,
+                  ROW_NUMBER() OVER (
+                    PARTITION BY vehicle_id, employee_id, ttpn_service_type_id,
+                                 client_id, ttpn_foreign_destiny_id
+                    ORDER BY tc_dt, tc_id
+                  ) AS pos
+  FROM candidates
+),
+matches AS (
+  SELECT tbp.tb_id, tcp.tc_id
+  FROM tb_pos tbp
+  JOIN tc_pos tcp USING (vehicle_id, employee_id, ttpn_service_type_id,
+                         client_id, ttpn_foreign_destiny_id, pos)
+),
+upd_tb AS (
+  UPDATE ttpn_bookings tb
+  SET viaje_encontrado = true, travel_count_id = m.tc_id, updated_at = NOW()
+  FROM matches m WHERE tb.id = m.tb_id
+  RETURNING tb.id
+),
+upd_tc AS (
+  UPDATE travel_counts tc
+  SET viaje_encontrado = true, ttpn_booking_id = m.tb_id, updated_at = NOW()
+  FROM matches m WHERE tc.id = m.tc_id
+  RETURNING tc.id
+)
+SELECT
+  (SELECT COUNT(*) FROM matches)   AS pares_identificados,
+  (SELECT COUNT(*) FROM upd_tb)    AS tbs_actualizados,
+  (SELECT COUNT(*) FROM upd_tc)    AS tcs_actualizados;
+```
+
+> Si el rango devuelve >5min de espera o timeout en Supabase UI: dividir
+> por semanas (`BETWEEN 'YYYY-MM-DD' AND 'YYYY-MM-DD'`) y correr cada
+> chunk. Idempotente.
+
+**Recomendación operativa**: agregar a cron de Sidekiq cada lunes pre-nómina
+para reconciliar huérfanos que pudieran quedar por Sidekiq caído, redeploy
+durante operación, etc.
 
 ---
 
