@@ -361,6 +361,16 @@ backfills.)_
 > (forward-only) una vez en el deploy, pero un **import posterior** las vuelve a
 > desincronizar — por eso este paso es obligatorio tras cada carga de datos.
 
+**🛡️ Auto-reset al boot del contenedor** (desde fix
+`auto-reset-sequences-on-boot`, 2026-05-30): el CMD del Dockerfile de producción
+corre `db:reset_sequences` tras `db:prepare` en cada deploy/restart. Eso
+significa que **cualquier restart del servicio kumi-admin-api re-sincroniza
+solo**. Si después de un import nada se rompe en runtime hasta el siguiente
+deploy, el deploy lo cura. Aun así, **es obligatorio disparar el cURL
+`reset_sequences` inmediatamente tras un import**: entre el final del import y
+el siguiente deploy puede haber horas durante las cuales un `POST` de la app
+dispara `PG::UniqueViolation` 500.
+
 ---
 
 ## 5.bis ⚠️ OBLIGATORIO tras restore de respaldo — re-ejecutar `db:migrate`
