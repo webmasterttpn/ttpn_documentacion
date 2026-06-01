@@ -16,9 +16,29 @@ configurar para que funcione en local y en producción.
 | Archivo | Responsabilidad |
 | --- | --- |
 | `config/initializers/action_mailer.rb` | Config única dev + prod. SMTP, `default_url_options`, lee TODO de ENV. |
-| `app/mailers/application_mailer.rb` | `default from:` con lambda → `"Kumi TTPN" <noreply@ttpn.com.mx>` leído de ENV. |
-| `app/mailers/*.rb` | Mailers concretos heredan FROM de `ApplicationMailer`. |
-| `config/initializers/devise.rb` | `mailer_sender` lambda → lee `MAIL_FROM` de ENV. |
+| `app/mailers/application_mailer.rb` | `default from:` con lambda → `"Kumi TTPN" <noreply@ttpn.com.mx>` leído de ENV. Incluye `helper MailerHelper`. Aplica `layout 'mailer'`. |
+| `app/mailers/*.rb` | Mailers concretos heredan FROM, helper y layout de `ApplicationMailer`. |
+| `app/helpers/mailer_helper.rb` | Expone `mail_logo_url` y `mail_app_url` a los templates. |
+| `app/views/layouts/mailer.html.erb` | Layout unificado con header rojo TTPN + logo + footer azul Kumi. CSS inline. |
+| `config/initializers/devise.rb` | `mailer_sender` lambda → lee `MAIL_FROM` de ENV. `parent_mailer = ApplicationMailer` para que Devise::Mailer aplique el mismo layout + helper. |
+
+## Look unificado de los correos
+
+Todos los correos (Asignation, ClientUser, Devise reset/unlock/etc.) usan el
+mismo layout: **header rojo TTPN con logo centrado**, body blanco con título azul
+Kumi y botón de acción en rojo, **footer azul Kumi** con leyenda "este correo es
+automático, no respondas". CSS 100% inline para máxima compatibilidad con email
+clients (Gmail web, Outlook, Apple Mail).
+
+El logo se sirve desde el FE Kumi:
+
+- Default: `https://<MAIL_LINK_HOST>/ttpn_logo.png`
+  (prod: `https://kumi.ttpn.com.mx/ttpn_logo.png`,
+   stage: `https://kumi-stage.netlify.app/ttpn_logo.png`)
+- Override completo: `MAIL_LOGO_URL` (p.ej. para apuntar a un CDN).
+
+Los links dentro del correo (botones "Cambiar contraseña", "Iniciar sesión",
+"Activar mi cuenta") usan `mail_app_url` que apunta al FE Kumi del environment.
 
 `config/environments/development.rb` y `production.rb` **no** tienen
 `config.action_mailer.*` — todo va por el initializer.
@@ -42,6 +62,7 @@ Opcionales (defaults técnicos Gmail — solo si cambias proveedor):
 | --- | --- | --- |
 | `SMTP_HOST` | `smtp.gmail.com` | Servidor SMTP. |
 | `SMTP_PORT` | `587` | Puerto STARTTLS estándar. |
+| `MAIL_LOGO_URL` | `https://<MAIL_LINK_HOST>/ttpn_logo.png` | Logo del header del correo. Solo override si tienes un CDN aparte. |
 
 Sin alguna obligatoria, el primer mail tira `KeyError` con el nombre exacto
 de la var faltante. No hay fallback hardcodeado al alias de `info@ttpn.com.mx`
