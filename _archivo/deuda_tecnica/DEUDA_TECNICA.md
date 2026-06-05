@@ -11,6 +11,82 @@ Actualizar el `Status` y el bloque `Avance` en lugar de crear archivos nuevos.
 
 ---
 
+### DT-027 — Cálculo de costo al "Sacar de VCPA": destino local hardcodeado y nómina cerrada
+
+**Registrada:** 2026-06-05 | **Dominio:** Backend — `ttpngas/`, `costo_viaje_chofer` / TravelCount#remove_vcpa | **Severidad:** Baja | **Status:** ⏳ Pendiente
+
+**Contexto:** La función PG `costo_viaje_chofer` (feature Sacar de VCPA) tiene dos
+deudas conocidas:
+
+1. **Destino local hardcodeado**: la regla "el nivel del chofer solo aplica a
+   viajes locales" se implementa comparando `destino = 'Chihuahua'` dentro de la
+   función (`db/functions/costo_viaje_chofer.sql`). Debería moverse a un
+   `KumiSetting`/catálogo (flag de destino local) en vez de comparar por texto.
+2. **Recálculo sobre nómina cerrada**: `remove_vcpa` recalcula `travel_counts.costo`
+   aunque el viaje ya pertenezca a una `payroll` cerrada (decisión de negocio:
+   permitir siempre). Si la nómina ya se pagó, altera un histórico hasta reprocesar.
+   Evaluar bloquear o avisar cuando la nómina está cerrada.
+
+**Nota:** la función legacy `pago_chofer` quedó confirmada como incompleta (ignora
+el incremento de cliente y trata el nivel como %); se dejó como dead code y NO se
+usa. Ver `Backend/dominio/bookings/funciones_postgres/costo_viaje_chofer.md`.
+
+---
+
+### DT-026 — `buscar_booking` (self-lookup en travel_counts) ~20% del tiempo de BD
+
+**Registrada:** 2026-06-03 | **Dominio:** Backend — `ttpngas/`, write path TravelCount | **Severidad:** Media | **Status:** ✅ Resuelto (2026-06-03, prod)
+
+**Causa raíz (EXPLAIN en prod):** `idx_travel_counts_cuadre_window` solo usa 3
+columnas de igualdad (vehicle_id, employee_id, ttpn_service_type_id); el rango
+está sobre la EXPRESIÓN `(fecha+hora)`, que no calza con las columnas
+`fecha`/`hora` sueltas → `Rows Removed by Filter: 1115` por lookup (escanea el
+historial completo del chofer).
+
+**Fix:** migración `20260603154500_add_travel_counts_busca_window_index` crea
+`idx_travel_counts_busca_window` (vehicle_id, employee_id, ttpn_service_type_id,
+ttpn_foreign_destiny_id, `((fecha+hora))`) parcial `WHERE status=true`. Sirve al
+SQL crudo display y al AR `TtpnCuadreService#travel_candidates_for`.
+
+**Resultado verificado en prod (mismo row real, antes → después):**
+
+| Métrica | Antes | Después |
+| --- | --- | --- |
+| Rows Removed by Filter | 1115 | 0 |
+| Buffers (shared hit) | 1051 | 14 |
+| Execution Time | 3.78 ms | 0.119 ms |
+| Costo scan | 45.58 | 2.66 |
+
+El rango `(fecha+hora)` entró al `Index Cond`. Desplegado a stage + main; aplicado
+manualmente con `railway run -- rails db:migrate` (Railway NO auto-migra).
+Evidencia: `session_notes/2026-06-03_performance_indices_y_stats_groupby.md`.
+
+En el snapshot de Supabase Query Performance (2026-06-03 14:32), tras resolver
+las cubetas A (stats GROUP BY) y C (índices `vehicles.clv` /
+`vehicle_asignations.fecha_hasta`), el siguiente hot query es el self-lookup que
+corre **dentro del INSERT de `travel_counts`** (función `buscar_booking` /
+`buscar_booking_id`):
+
+- `SELECT ... FROM travel_counts tc, employees, client_branch_offices, vehicles, ttpn_foreign_destinies WHERE (tc.fecha+tc.hora) BETWEEN ... AND tc.employee_id=? AND tc.client_branch_office_id=? AND tc.ttpn_service_type_id=? AND tc.ttpn_foreign_destiny_id=? AND tc.vehicle_id=? AND tc.status=?`
+- 371 calls, mean **40 ms**, max **1448 ms**, ≈ 19.8% del tiempo total de BD.
+
+El predicado combina 6 igualdades + rango sobre la expresión `(fecha+hora)`. El
+índice `idx_travel_counts_cuadre_window` (vehicle_id, employee_id,
+ttpn_service_type_id, fecha, hora) cubre solo parte; faltan
+`client_branch_office_id` y `ttpn_foreign_destiny_id`, y el rango es sobre la
+expresión, no sobre `fecha` sola.
+
+**Plan:** correr `EXPLAIN (ANALYZE, BUFFERS)` en producción con un caso real
+**antes** de tocar nada (regla del proyecto: no índices por reflejo). Según el
+plan, evaluar un índice parcial expresión-aware
+(`((fecha+hora)) WHERE status=true` + columnas de igualdad) o reescribir la
+función. Es write path dentro de transacción, así que medir impacto en el INSERT,
+no solo en el SELECT aislado.
+
+**Referencia:** `Documentacion/_archivo/session_notes/2026-06-03_performance_indices_y_stats_groupby.md`.
+
+---
+
 ### DT-025 — `minimum_coverage_by_file 50` deshabilitado en SimpleCov
 
 **Registrada:** 2026-05-30 | **Dominio:** Backend — `ttpngas/` | **Severidad:** Baja | **Status:** Pendiente
