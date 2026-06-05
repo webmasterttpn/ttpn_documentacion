@@ -27,7 +27,8 @@ empleado seleccionado con tres ayudas para roles **Sistemas / sadmin**:
 
 ## Integración (VehicleAsignationsPage.vue)
 
-- Gate: `canInspectEmployee = authStore.user?.sadmin === true || authStore.user?.role === 'Sistemas'`.
+- Gate: `canInspectEmployee = sadmin === true || role.toLowerCase() === 'sistemas'` (el rol en BD es
+  `sistemas`, minúsculas, id 1; la comparación es case-insensitive).
 - Carga el empleado completo del seleccionado con `employeesService.find(id)` (para tener nombres
   crudos + `fecha_nacimiento`; el listado usa el serializer minimal que no trae la fecha).
 - `openEmployeeEdit(id)` → `window.open(router.resolve({ path: '/employees', query: { edit: id } }).href, '_blank')`.
